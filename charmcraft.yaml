@@ -1,66 +1,59 @@
 # This file configures Charmcraft.
 # See https://canonical-charmcraft.readthedocs-hosted.com/en/stable/reference/files/charmcraft-yaml-file/
 type: charm
-name: hive-metastore-k8s-operator
-title: Charm Template
-summary: A very short one-line summary of the charm.
+name: hive-metastore-k8s
+title: Hive Metastore K8s Operator
+summary: Deploy and configure the Apache Hive Metastore on Kubernetes.
 description: |
-  A single sentence that says what the charm is, concisely and memorably.
-
-  A paragraph of one to three short sentences, that describe what the charm does.
-
-  A third paragraph that explains what need the charm meets.
-
-  Finally, a paragraph that describes whom the charm is useful for.
+  The Hive Metastore K8s Operator deploys the Hive Metastore using a pre-built
+  Hive Metastore rock and integrates with a charmed PostgreSQL database.
+  It is designed for integrating with Trino that rely on Hive-compatible metadata
+  services running on Kubernetes for certain use cases.
 
 # Documentation:
 # https://canonical-charmcraft.readthedocs-hosted.com/en/stable/howto/build-guides/select-platforms/
-base: ubuntu@22.04
+base: ubuntu@24.04
 platforms:
   amd64:
-  arm64:
 
 
 parts:
   charm:
     plugin: charm
     source: .
+    prime:
+      - "-hive_metastore_rock"
+      - "-tests"
 
-# (Optional) Configuration options for the charm
-# This config section defines charm config options, and populates the Configure
-# tab on Charmhub.
-# More information on this section at:
-# https://canonical-charmcraft.readthedocs-hosted.com/en/stable/reference/files/charmcraft-yaml-file/#config
-# General configuration documentation:
-# https://canonical-juju.readthedocs-hosted.com/en/latest/user/reference/configuration/#application-configuration
+charm-libs:
+  - lib: data_platform_libs.data_interfaces
+    version: "0"
+  - lib: data_platform_libs.data_models
+    version: "0"
+
 config:
   options:
-    # An example config option to customise the log level of the workload
     log-level:
       description: |
-        Configures the log level of gunicorn.
+        Configures the Hive Metastore JVM logging level.
 
         Acceptable values are: "info", "debug", "warning", "error" and "critical"
       default: "info"
       type: string
 
 
-# Your workload’s containers.
-# https://canonical-charmcraft.readthedocs-hosted.com/en/stable/reference/files/charmcraft-yaml-file/#containers
 containers:
-  httpbin:
-    resource: some-container-image
+  hive-metastore:
+    resource: hive-metastore-image
 
 
-# This field populates the Resources tab on Charmhub.
-# https://canonical-charmcraft.readthedocs-hosted.com/en/stable/reference/files/charmcraft-yaml-file/#resources
 resources:
-  # An OCI image resource for each container listed above.
-  # You may remove this if your charm will run without a workload sidecar container.
-  some-container-image:
+  hive-metastore-image:
     type: oci-image
-    description: OCI image for the 'some-container' container
-    # The upstream-source field is ignored by Charmcraft and Juju, but it can be
-    # useful to developers in identifying the source of the OCI image.  It is also
-    # used by the 'canonical/charming-actions' Github action for automated releases.
-    upstream-source: some-repo/some-image:some-tag
+    description: OCI image built from rock/rockcraft.yaml for the Hive Metastore service.
+
+
+requires:
+  postgresql:
+    interface: postgresql_client
+    limit: 1
