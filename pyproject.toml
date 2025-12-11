@@ -1,3 +1,46 @@
+[project]
+name = "hive-metastore-k8s-operator"
+version = "0.1.0"
+requires-python = ">=3.12"
+
+dependencies = [
+    "ops>=3.4.0,<4",
+]
+
+[dependency-groups]
+# Dependencies for PYDEPS of charm libraries
+charmlibs-pydeps = [
+    "ops>=2.0.0",
+    "pydantic>=1.10,<2",
+]
+
+# Dependencies for linting and type checks
+lint = [
+    "ruff",
+    "codespell",
+    "pyright",
+]
+
+# Dependencies for static analysis
+static = [
+    "bandit[toml]",
+]
+
+# Dependencies for unit tests
+unit = [
+    "coverage[toml]",
+    "ops[testing]",
+    "pytest",
+]
+
+# Dependencies for integration tests
+integration = [
+    "jubilant",
+    "pydantic",
+    "pytest",
+    "pytest-operator",
+]
+
 # Testing tools configuration
 [tool.coverage.run]
 branch = true
@@ -39,3 +82,4 @@ skip = "build,lib,venv,icon.svg,.tox,.git,.mypy_cache,.ruff_cache,.coverage"
 
 [tool.pyright]
 include = ["src/**.py"]
+extraPaths = ["lib"]  # get language server for libs

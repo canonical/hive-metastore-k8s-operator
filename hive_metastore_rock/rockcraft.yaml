@@ -1,0 +1,70 @@
+name: hive-metastore
+base: ubuntu@24.04
+version: '3.0.0'
+summary: "Apache Hive Metastore 3.0.0 Rock"
+description: "OCI image for Hive Metastore service."
+platforms:
+    amd64:
+
+parts:
+  # ---- Base Packages ----
+  base-packages:
+    plugin: nil
+    overlay-packages:
+      - curl
+      - vim
+  
+  # ---- Java Runtime ----
+  java:
+    plugin: nil
+    overlay-packages:
+      - openjdk-8-jre-headless
+
+  # ---- Hadoop Binaries (Required by Hive) ----
+  hadoop:
+    plugin: dump
+    source: https://dlcdn.apache.org/hadoop/common/hadoop-3.3.6/hadoop-3.3.6.tar.gz
+    source-checksum: sha512/de3eaca2e0517e4b569a88b63c89fae19cb8ac6c01ff990f1ff8f0cc0f3128c8e8a23db01577ca562a0e0bb1b4a3889f8c74384e609cd55e537aada3dcaa9f8a
+    organize:
+      "*": opt/hadoop/
+    stage:
+      - opt/hadoop
+
+  # ---- Hive Metastore ----
+  hive:
+    plugin: dump
+    source: https://dlcdn.apache.org/hive/hive-standalone-metastore-3.0.0/hive-standalone-metastore-3.0.0-bin.tar.gz
+    source-checksum: sha256/c8af45a92a60664f95811ca3011c34f50bf9614aab3e99f9fd10775c90b40847
+    organize:
+      "*": opt/hive/
+    stage:
+      - opt/hive
+
+  # ---- PostgreSQL JDBC Driver ----
+  postgres-jdbc:
+    after:
+      - hive
+    plugin: dump
+    source: https://jdbc.postgresql.org/download/postgresql-42.7.7.jar
+    source-checksum: sha512/3383843ca60f29c796056421211b81752177bc89f85b7c513f6289895d33614bbf4908db4c6c9236ff31236a95a1120e91038666c59b6929a08f2d26ec6d1dc4
+    source-type: file
+    organize:
+      "postgresql-42.7.7.jar": opt/hive/lib/postgresql-42.7.7.jar
+    stage:
+      - opt/hive/lib/postgresql-42.7.7.jar
+
+# ---- Service Definition ----
+services:
+  hive-metastore:
+    override: replace
+    command: "/opt/hive/bin/start-metastore"
+    startup: enabled
+    environment:
+      HIVE_HOME: "/opt/hive"
+      HADOOP_HOME: "/opt/hadoop"
+      JAVA_HOME: "/usr/lib/jvm/java-8-openjdk-amd64"
+      # Tell Hive/Hadoop to look for config in this dir,
+      # which is where the charm will mount its configuration.
+      HIVE_CONF_DIR: "/etc/hive-conf"
+      HADOOP_CONF_DIR: "/etc/hive-conf"
+      PATH: "/opt/hadoop/bin:/opt/hive/bin:$PATH"

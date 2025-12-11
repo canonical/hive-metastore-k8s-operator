@@ -1,4 +1,4 @@
-# Copyright 2025 Mert Alp Taytak
+# Copyright 2025 Canonical Ltd.
 # See LICENSE file for licensing details.
 #
 # Learn more about testing at: https://juju.is/docs/sdk/testing
@@ -43,7 +43,9 @@ def test_httpbin_pebble_ready():
 def test_config_changed_valid_can_connect():
     """Test a config-changed event when the config is valid and the container can be reached."""
     # Arrange:
-    ctx = testing.Context(HiveMetastoreK8SOperatorCharm)  # The default config will be read from charmcraft.yaml
+    ctx = testing.Context(
+        HiveMetastoreK8SOperatorCharm
+    )  # The default config will be read from charmcraft.yaml
     container = testing.Container("httpbin", can_connect=True)
     state_in = testing.State(
         containers={container},
