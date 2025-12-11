@@ -1,0 +1,11 @@
+# Copyright 2025 Canonical Ltd.
+# See LICENSE file for licensing details.
+
+CONTAINER_NAME = "hive-metastore"
+SERVICE_NAME = "hive-metastore"
+DEFAULT_DATABASE_NAME = "hive_metastore"
+HIVE_CONF_DIR = "/etc/hive-conf"
+HIVE_SITE_PATH = f"{HIVE_CONF_DIR}/hive-site.xml"
+POSTGRES_CA_PATH = f"{HIVE_CONF_DIR}/postgresql-ca.crt"
+SCHEMA_TOOL_TIMEOUT = 600
+HIVE_PORT = 9083

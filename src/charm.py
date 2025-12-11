@@ -15,37 +15,18 @@ from charms.data_platform_libs.v0.data_interfaces import (
     DatabaseEndpointsChangedEvent,
     DatabaseRequires,
 )
-from charms.data_platform_libs.v0.data_models import BaseConfigModel, TypedCharmBase
+from charms.data_platform_libs.v0.data_models import TypedCharmBase
 from ops.framework import StoredState
 from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus, WaitingStatus
 from ops.pebble import APIError, ChangeError, ConnectionError, ExecError
-from pydantic import ValidationError, validator
+from pydantic import ValidationError
+
+from config import CharmConfig
+import constants
 
 logger = logging.getLogger(__name__)
 
 
-VALID_LOG_LEVELS = {"debug", "info", "warning", "error", "critical"}
-CONTAINER_NAME = "hive-metastore"
-SERVICE_NAME = "hive-metastore"
-DEFAULT_DATABASE_NAME = "hive_metastore"
-HIVE_CONF_DIR = "/etc/hive-conf"
-HIVE_SITE_PATH = f"{HIVE_CONF_DIR}/hive-site.xml"
-POSTGRES_CA_PATH = f"{HIVE_CONF_DIR}/postgresql-ca.crt"
-SCHEMA_TOOL_TIMEOUT = 600
-HIVE_PORT = 9083
-
-
-class CharmConfig(BaseConfigModel):
-    """Typed configuration for the charm."""
-
-    log_level: str = "info"
-
-    @validator("log_level")
-    def _validate_log_level(cls, value: str) -> str:
-        lowered = value.lower()
-        if lowered not in VALID_LOG_LEVELS:
-            raise ValueError(f"log level must be one of {', '.join(sorted(VALID_LOG_LEVELS))}")
-        return lowered
 
 
 class SchemaInitializationError(RuntimeError):
@@ -69,10 +50,10 @@ class HiveMetastoreK8SOperatorCharm(TypedCharmBase[CharmConfig]):
         self.postgresql = DatabaseRequires(
             self,
             relation_name="postgresql",
-            database_name=DEFAULT_DATABASE_NAME,
+            database_name=constants.DEFAULT_DATABASE_NAME,
         )
 
-        framework.observe(self.on[CONTAINER_NAME].pebble_ready, self._on_container_ready)
+        framework.observe(self.on[constants.CONTAINER_NAME].pebble_ready, self._on_container_ready)
         framework.observe(self.on.config_changed, self._on_config_changed)
 
         framework.observe(self.postgresql.on.database_created, self._on_database_event)
@@ -86,16 +67,7 @@ class HiveMetastoreK8SOperatorCharm(TypedCharmBase[CharmConfig]):
         self._reconcile()
 
     def _on_config_changed(self, event: ops.ConfigChangedEvent) -> None:
-        self.unit.open_port("tcp", HIVE_PORT)
-
-        try:
-            _ = self.config.log_level
-        except ValidationError as exc:  # pragma: nocover - config validation path
-            logger.warning("Invalid configuration: %s", exc)
-            self.unit.status = BlockedStatus("invalid log-level configuration")
-            event.defer()
-            return
-
+        self.unit.open_port("tcp", constants.HIVE_PORT)
         self._reconcile()
 
     def _on_database_event(
@@ -135,13 +107,6 @@ class HiveMetastoreK8SOperatorCharm(TypedCharmBase[CharmConfig]):
             self.unit.status = WaitingStatus("waiting for container startup")
             return
 
-        try:
-            log_level = self.config.log_level
-        except ValidationError as exc:  # pragma: nocover - config validation path
-            logger.warning("Invalid configuration during reconcile: %s", exc)
-            self.unit.status = BlockedStatus("invalid log-level configuration")
-            return
-
         connection = self._stored.connection_info
         if not connection:
             self._stop_service(container)
@@ -157,7 +122,7 @@ class HiveMetastoreK8SOperatorCharm(TypedCharmBase[CharmConfig]):
             return
 
         try:
-            self._apply_pebble_layer(container, log_level)
+            self._apply_pebble_layer(container)
         except ConnectionError:
             self.unit.status = WaitingStatus("waiting for pebble service")
             return
@@ -165,7 +130,7 @@ class HiveMetastoreK8SOperatorCharm(TypedCharmBase[CharmConfig]):
         if not self._stored.schema_initialized:
             try:
                 self.unit.status = MaintenanceStatus("initialising metastore schema")
-                self._initialize_schema(container, log_level)
+                self._initialize_schema(container)
                 self._stored.schema_initialized = True
             except SchemaInitializationError as exc:
                 logger.error("Schema initialisation failed: %s", exc)
@@ -176,9 +141,9 @@ class HiveMetastoreK8SOperatorCharm(TypedCharmBase[CharmConfig]):
                 return
 
         try:
-            service = container.get_service(SERVICE_NAME)
+            service = container.get_service(constants.SERVICE_NAME)
             if not service.is_running():
-                container.start(SERVICE_NAME)
+                container.start(constants.SERVICE_NAME)
         except ConnectionError:
             self.unit.status = WaitingStatus("waiting for container startup")
             return
@@ -193,7 +158,7 @@ class HiveMetastoreK8SOperatorCharm(TypedCharmBase[CharmConfig]):
 
     def _get_container(self) -> Optional[ops.Container]:
         try:
-            return self.unit.get_container(CONTAINER_NAME)
+            return self.unit.get_container(constants.CONTAINER_NAME)
         except ops.model.ModelError:
             return None
 
@@ -229,7 +194,7 @@ class HiveMetastoreK8SOperatorCharm(TypedCharmBase[CharmConfig]):
         elif not info.get("tls"):
             info.pop("tls_ca", None)
 
-        info.setdefault("database", DEFAULT_DATABASE_NAME)
+        info.setdefault("database", constants.DEFAULT_DATABASE_NAME)
 
         required_fields = {"host", "port", "database", "username", "password"}
         if all(info.get(field) for field in required_fields):
@@ -241,15 +206,15 @@ class HiveMetastoreK8SOperatorCharm(TypedCharmBase[CharmConfig]):
 
     def _render_configuration(self, container: ops.Container, info: Dict[str, object]) -> None:
         hive_site = self._render_hive_site(info)
-        container.push(HIVE_SITE_PATH, hive_site, make_dirs=True, permissions=0o640)
+        container.push(constants.HIVE_SITE_PATH, hive_site, make_dirs=True, permissions=0o640)
 
         if info.get("tls") and info.get("tls_ca"):
             ca_content = self._normalise_ca(str(info["tls_ca"]))
-            container.push(POSTGRES_CA_PATH, ca_content, make_dirs=True, permissions=0o600)
+            container.push(constants.POSTGRES_CA_PATH, ca_content, make_dirs=True, permissions=0o600)
         else:
             try:
-                if container.exists(POSTGRES_CA_PATH):
-                    container.remove_path(POSTGRES_CA_PATH)
+                if container.exists(constants.POSTGRES_CA_PATH):
+                    container.remove_path(constants.POSTGRES_CA_PATH)
             except APIError:
                 logger.debug("Failed to remove CA file; it may not exist yet")
 
@@ -263,7 +228,7 @@ class HiveMetastoreK8SOperatorCharm(TypedCharmBase[CharmConfig]):
             "datanucleus.autoCreateSchema": "false",
             "datanucleus.fixedDatastore": "true",
             "hive.metastore.schema.verification": "false",
-            "hive.metastore.uris": f"thrift://0.0.0.0:{HIVE_PORT}",
+            "hive.metastore.uris": f"thrift://0.0.0.0:{constants.HIVE_PORT}",
         }
 
         lines = [
@@ -298,19 +263,19 @@ class HiveMetastoreK8SOperatorCharm(TypedCharmBase[CharmConfig]):
         params = ["sslmode=require"]
         if info.get("tls_ca"):
             params[0] = "sslmode=verify-ca"
-            params.append(f"sslrootcert={POSTGRES_CA_PATH}")
+            params.append(f"sslrootcert={constants.POSTGRES_CA_PATH}")
 
         return f"{base}?{'&'.join(params)}"
 
     def _apply_pebble_layer(self, container: ops.Container, log_level: str) -> None:
         desired_layer = self._pebble_layer(log_level)
         plan = container.get_plan()
-        current_service = plan.services.get(SERVICE_NAME)
+        current_service = plan.services.get(constants.SERVICE_NAME)
         current_dict = current_service.to_dict() if current_service else None
-        desired_dict = desired_layer["services"][SERVICE_NAME]
+        desired_dict = desired_layer["services"][constants.SERVICE_NAME]
 
         if current_dict != desired_dict:
-            container.add_layer(SERVICE_NAME, desired_layer, combine=True)
+            container.add_layer(constants.SERVICE_NAME, desired_layer, combine=True)
             container.replan()
 
     def _pebble_layer(self, log_level: str) -> ops.pebble.LayerDict:
@@ -319,7 +284,7 @@ class HiveMetastoreK8SOperatorCharm(TypedCharmBase[CharmConfig]):
             "summary": "Hive Metastore service",
             "description": "Pebble layer configuring the Hive Metastore process",
             "services": {
-                SERVICE_NAME: {
+                constants.SERVICE_NAME: {
                     "override": "replace",
                     "summary": "Hive Metastore",
                     "command": "/opt/hive/bin/hive --service metastore",
@@ -334,8 +299,8 @@ class HiveMetastoreK8SOperatorCharm(TypedCharmBase[CharmConfig]):
             "HIVE_HOME": "/opt/hive",
             "HADOOP_HOME": "/opt/hadoop",
             "JAVA_HOME": "/usr/lib/jvm/java-8-openjdk-amd64",
-            "HIVE_CONF_DIR": HIVE_CONF_DIR,
-            "HADOOP_CONF_DIR": HIVE_CONF_DIR,
+            "HIVE_CONF_DIR": constants.HIVE_CONF_DIR,
+            "HADOOP_CONF_DIR": constants.HIVE_CONF_DIR,
             "PATH": "/opt/hadoop/bin:/opt/hive/bin:/usr/bin:/bin",
             "HIVE_METASTORE_LOGLEVEL": log_level,
         }
@@ -351,7 +316,7 @@ class HiveMetastoreK8SOperatorCharm(TypedCharmBase[CharmConfig]):
 
         process = container.exec(
             command,
-            timeout=SCHEMA_TOOL_TIMEOUT,
+            timeout=constants.SCHEMA_TOOL_TIMEOUT,
             environment=self._service_environment(log_level),
         )
 
@@ -370,13 +335,13 @@ class HiveMetastoreK8SOperatorCharm(TypedCharmBase[CharmConfig]):
 
     def _stop_service(self, container: ops.Container) -> None:
         try:
-            service = container.get_service(SERVICE_NAME)
+            service = container.get_service(constants.SERVICE_NAME)
         except ConnectionError:
             return
 
         if service.is_running():
             try:
-                container.stop(SERVICE_NAME)
+                container.stop(constants.SERVICE_NAME)
             except ChangeError as exc:
                 logger.debug("Failed to stop service cleanly: %s", exc)
 

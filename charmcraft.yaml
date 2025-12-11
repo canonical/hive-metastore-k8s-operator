@@ -29,13 +29,64 @@ charm-libs:
 
 config:
   options:
-    log-level:
-      description: |
-        The log level for the Hive Metastore service. 
-
-        Acceptable values are: "info", "debug", "warning", "error" and "critical"
-      default: "info"
+    additional-jvm-options:
       type: string
+      default: ""
+      description: |
+        Additional options to tune JVM.
+        Format: A string of constructed as if calling `java` with them.
+        Example: "-Xmx2g -Xms256m"
+    # https://cwiki.apache.org/confluence/pages/viewpage.action?pageId=27842758#ConfigurationProperties-hive.metastore.server.min.threads
+    hms-min-threads:
+      type: integer
+      default: 200
+      description: Minimum number of threads for the Hive Metastore service.
+    # https://cwiki.apache.org/confluence/pages/viewpage.action?pageId=27842758#ConfigurationProperties-hive.metastore.server.min.threads
+    hms-max-threads:
+      type: integer
+      default: 1000
+      description: Maximum number of threads for the Hive Metastore service.
+    kubernetes-requests:
+      type: string
+      default: ""
+      description: |
+        Custom resource requests for the Hive Metastore container.
+        Format: Comma separated key=value pairs of 'cpu' and 'memory'.
+        Example: "cpu=100m,memory=256Mi".
+    kubernetes-limits:
+      type: string
+      default: ""
+      description: |
+        Custom resource limits for the Hive Metastore container.
+        Format: Comma separated key=value pairs of 'cpu' and 'memory'.
+        Example: "cpu=500m,memory=1Gi".
+    # https://cwiki.apache.org/confluence/pages/viewpage.action?pageId=27842758#ConfigurationProperties-datanucleus.connectionPoolingType
+    sql-connection-pool-max-size:
+      type: integer
+      default: 10
+      description: Maximum size of the SQL connection pool to the backend database.
+
+actions:
+  clear-init-flag:
+    description: Clear the initialization flag to recover from a broken state.
+
+  restart:
+    description: Restart the Hive Metastore service.
+
+  restore-schema-dirs:
+    description: Restore the Hive Metastore schema directories from backend database.
+
+  schematool-info:
+    description: Runs `schematool` with `info` option to display versions.
+
+  schematool-validate:
+    description: Runs `schematool` with `validate` option to validate the metadata.
+
+storage:
+  hive-metastore-warehouse:
+    description: Persistent storage for Hive Metastore metadata.
+    type: persistent
+    minimum-size: 1G
 
 containers:
   hive-metastore:
@@ -44,7 +95,7 @@ containers:
 resources:
   hive-metastore-image:
     type: oci-image
-    description: OCI image built from rock/rockcraft.yaml for the Hive Metastore service.
+    description: OCI image built from hive_metastore_rock/rockcraft.yaml for the Hive Metastore service.
 
 requires:
   postgresql:
