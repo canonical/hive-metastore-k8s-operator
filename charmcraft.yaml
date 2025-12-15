@@ -1,7 +1,7 @@
 # This file configures Charmcraft.
 # See https://canonical-charmcraft.readthedocs-hosted.com/en/stable/reference/files/charmcraft-yaml-file/
 type: charm
-name: hive-metastore-k8s-operator
+name: hive-metastore-k8s
 title: Hive Metastore K8s Operator
 summary: Deploy and configure the Apache Hive Metastore on Kubernetes.
 description: |
@@ -18,6 +18,8 @@ parts:
   charm:
     plugin: uv
     source: .
+    uv-groups:
+      - charmlibs-pydeps
     build-snaps:
       - astral-uv
 
@@ -38,12 +40,12 @@ config:
         Example: "-Xmx2g -Xms256m"
     # https://cwiki.apache.org/confluence/pages/viewpage.action?pageId=27842758#ConfigurationProperties-hive.metastore.server.min.threads
     hms-min-threads:
-      type: integer
+      type: int
       default: 200
       description: Minimum number of threads for the Hive Metastore service.
     # https://cwiki.apache.org/confluence/pages/viewpage.action?pageId=27842758#ConfigurationProperties-hive.metastore.server.min.threads
     hms-max-threads:
-      type: integer
+      type: int
       default: 1000
       description: Maximum number of threads for the Hive Metastore service.
     kubernetes-requests:
@@ -62,7 +64,7 @@ config:
         Example: "cpu=500m,memory=1Gi".
     # https://cwiki.apache.org/confluence/pages/viewpage.action?pageId=27842758#ConfigurationProperties-datanucleus.connectionPoolingType
     sql-connection-pool-max-size:
-      type: integer
+      type: int
       default: 10
       description: Maximum size of the SQL connection pool to the backend database.
 
@@ -84,13 +86,17 @@ actions:
 
 storage:
   hive-metastore-warehouse:
+    type: filesystem 
     description: Persistent storage for Hive Metastore metadata.
-    type: persistent
-    minimum-size: 1G
+    minimum-size: 100M
 
 containers:
   hive-metastore:
     resource: hive-metastore-image
+    mounts:
+      - storage: hive-metastore-warehouse
+        # TODO (mertalpt): Verify and use
+        location: /user/hive/warehouse
 
 resources:
   hive-metastore-image:
