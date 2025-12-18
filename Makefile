@@ -1,11 +1,17 @@
 # Variables for paths and configuration
-MKFILE_PATH := $(abspath $(lastword $(MAKEFILE_LIST)))
-PROJECT_ROOT := $(dir $(MKFILE_PATH))
 
-CHARMCRAFT_YAML := $(PROJECT_ROOT)charmcraft.yaml
-ROCK_DIR := $(PROJECT_ROOT)hive_metastore_rock
+# Get absolute path to root independent of working directory
+MKFILE_PATH := $(abspath $(lastword $(MAKEFILE_LIST)))
+PROJECT_ROOT := $(patsubst %/,%,$(dir $(MKFILE_PATH)))
+
+# Shell strict mode
+SHELL := /bin/bash
+.SHELLFLAGS := -eu -o pipefail -c
+
+CHARMCRAFT_YAML := $(PROJECT_ROOT)/charmcraft.yaml
+ROCK_DIR := $(PROJECT_ROOT)/hive_metastore_rock
 ROCKCRAFT_YAML := $(ROCK_DIR)/rockcraft.yaml
-IMPORT_SCRIPT := $(PROJECT_ROOT)scripts/import_rock.sh
+IMPORT_SCRIPT := $(PROJECT_ROOT)/scripts/import_rock.sh
 
 REGISTRY := localhost:32000
 
@@ -18,44 +24,96 @@ ROCK_VERSION := $(shell yq '.version' $(ROCKCRAFT_YAML))
 ROCK_ARCH := amd64
 
 # The expected output files from charmcraft/rockcraft pack
-CHARM_FILE := $(PROJECT_ROOT)$(CHARM_NAME)_$(CHARM_ARCH).charm
+CHARM_FILE := $(PROJECT_ROOT)/$(CHARM_NAME)_$(CHARM_ARCH).charm
 ROCK_FILE := $(ROCK_DIR)/$(ROCK_NAME)_$(ROCK_VERSION)_$(ROCK_ARCH).rock
 
-# Phony targets are not files
-.PHONY: all build build_charm build_rock clean clean_charmcraft clean_rockcraft deploy_local help import_rock
-
 # Default target
+.PHONY: all
 all: build
 
+.PHONY: help
 help:
 	@echo "Usage: make [target]"
 	@echo ""
 	@echo "Targets:"
-	@echo "  build_rock   Build the OCI archive (rock) using rockcraft"
-	@echo "  import_rock  Build and import the rock into MicroK8s"
-	@echo "  clean        Remove built rock files"
-	@echo "  help         Show this help message"
+	@echo "  build             Build both charm and rock"
+	@echo "  build-charm       Build the charm using charmcraft"
+	@echo "  build-rock        Build the OCI archive (rock) using rockcraft"
+	@echo "  check-deps        Check if necessary dependencies are installed"
+	@echo "  checks            Run all the code quality checks"
+	@echo "  clean             Remove built charm and rock files"
+	@echo "  clean-charmcraft  Clean charmcraft environment"
+	@echo "  clean-rockcraft   Clean rockcraft environment"
+	@echo "  deploy-local      Deploy charm with local resources"
+	@echo "  fmt               Apply coding style standards to code"
+	@echo "  import-rock       Build and import the rock into MicroK8s"
+	@echo "  lint              Check code against coding style standards"
+	@echo "  test              Run unit and static tests"
+	@echo "  test-integration  Run integration tests"
+	@echo "  test-static       Run static type checks"
+	@echo "  test-unit         Run unit tests"
+	@echo "  help              Show this help message"
 
-build: build_charm build_rock
+.PHONY: build
+build: build-charm build-rock
 
+.PHONY: check-deps
+check-deps:
+	@which yq >/dev/null || (echo "yq not found" && exit 1)
+	@which charmcraft >/dev/null || (echo "charmcraft not found" && exit 1)
+	@which rockcraft >/dev/null || (echo "rockcraft not found" && exit 1)
+	@which juju >/dev/null || (echo "juju not found" && exit 1)
+	@which tox >/dev/null || (echo "tox not found" && exit 1)
+
+.PHONY: checks
+checks: fmt lint test
+
+.PHONY: clean
 clean:
 	@echo "Cleaning up..."
 	rm -f $(PROJECT_ROOT)/*.charm
 	rm -f $(ROCK_DIR)/*.rock
 
-clean_charmcraft:
+.PHONY: clean-charmcraft
+clean-charmcraft:
 	@echo "Cleaning charmcraft environment..."
 	cd $(PROJECT_ROOT) && charmcraft clean
 
-clean_rockcraft:
+.PHONY: clean-rockcraft
+clean-rockcraft:
 	@echo "Cleaning rockcraft environment..."
 	cd $(ROCK_DIR) && rockcraft clean
 
-deploy_local:
+.PHONY: deploy-local
+deploy-local:
 	@echo "Deploying charm with local resources..."
 	juju deploy $(CHARM_FILE) --resource hive-metastore-image=$(REGISTRY)/$(ROCK_NAME):$(ROCK_VERSION)
 
-build_charm:
+.PHONY: fmt
+fmt:
+	tox -e format
+
+.PHONY: lint
+lint:
+	tox -e lint
+
+.PHONY: test
+test: test-unit test-static
+
+.PHONY: test-integration
+test-integration:
+	tox -e integration
+
+.PHONY: test-static
+test-static:
+	tox -e static
+
+.PHONY: test-unit
+test-unit:
+	tox -e unit
+
+.PHONY: build-charm
+build-charm:
 	@echo "Building charm..."
 	cd $(PROJECT_ROOT) && charmcraft pack --use-lxd --verbose
 
@@ -64,9 +122,11 @@ $(ROCK_FILE): $(ROCKCRAFT_YAML)
 	@echo "Building rock..."
 	cd $(ROCK_DIR) && rockcraft pack --use-lxd --verbose
 
-build_rock: $(ROCK_FILE)
+.PHONY: build-rock
+build-rock: $(ROCK_FILE)
 
-# import_rock depends on the rock file
-import_rock: $(ROCK_FILE)
+# import-rock depends on the rock file
+.PHONY: import-rock
+import-rock: $(ROCK_FILE)
 	@echo "Importing rock $(ROCK_FILE)..."
-	$(IMPORT_SCRIPT) $(ROCK_FILE) $(NAME) $(VERSION)
+	$(IMPORT_SCRIPT) $(ROCK_FILE) $(ROCK_NAME) $(ROCK_VERSION)
