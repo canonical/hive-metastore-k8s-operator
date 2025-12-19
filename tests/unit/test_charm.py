@@ -3,94 +3,134 @@
 #
 # Learn more about testing at: https://juju.is/docs/sdk/testing
 
-import ops
-import ops.pebble
+import textwrap
+
 from ops import testing
 
+import constants
 from charm import HiveMetastoreK8SOperatorCharm
 
 
-def test_httpbin_pebble_ready():
+def test_pebble_ready():
+    """Test state in pebble-ready after fresh install."""
     # Arrange:
     ctx = testing.Context(HiveMetastoreK8SOperatorCharm)
-    container = testing.Container("httpbin", can_connect=True)
-    state_in = testing.State(containers={container})
+    container = testing.Container("hive-metastore", can_connect=True)
+    state_in = testing.State(
+        containers={container},
+        leader=True,
+    )
 
     # Act:
     state_out = ctx.run(ctx.on.pebble_ready(container), state_in)
 
     # Assert:
     updated_plan = state_out.get_container(container.name).plan
-    expected_plan = {
-        "services": {
-            "httpbin": {
-                "override": "replace",
-                "summary": "httpbin",
-                "command": "gunicorn -b 0.0.0.0:80 httpbin:app -k gevent",
-                "startup": "enabled",
-                "environment": {"GUNICORN_CMD_ARGS": "--log-level info"},
-            }
-        },
-    }
+    expected_plan = {}
     assert expected_plan == updated_plan
-    assert (
-        state_out.get_container(container.name).service_statuses["httpbin"]
-        == ops.pebble.ServiceStatus.ACTIVE
-    )
-    assert state_out.unit_status == testing.ActiveStatus()
+    assert state_out.unit_status == testing.BlockedStatus("waiting for postgresql relation")
 
 
-def test_config_changed_valid_can_connect():
-    """Test a config-changed event when the config is valid and the container can be reached."""
+def test_database_created():
+    """Test state in database-created after PostgreSQL relation."""
     # Arrange:
-    ctx = testing.Context(
-        HiveMetastoreK8SOperatorCharm
-    )  # The default config will be read from charmcraft.yaml
-    container = testing.Container("httpbin", can_connect=True)
+    ctx = testing.Context(HiveMetastoreK8SOperatorCharm)
+    container = testing.Container(
+        "hive-metastore",
+        can_connect=True,
+        execs=[
+            testing.Exec(
+                [constants.SCHEMATOOL_PATH, "-dbType", "postgres", "-info"],
+                return_code=1,
+                stderr="Failed to get schema version",
+            ),
+            testing.Exec(
+                [constants.SCHEMATOOL_PATH, "-dbType", "postgres", "-initSchema", "-verbose"],
+                return_code=0,
+            ),
+        ],
+    )
+    tls_secret = testing.Secret(
+        {
+            "tls": "False",
+        }
+    )
+    user_secret = testing.Secret(
+        {
+            "username": "foo",
+            "password": "bar",
+        }
+    )
+    relation = testing.Relation(
+        endpoint="postgresql",
+        interface="postgresql_client",
+        remote_app_name="postgresql-k8s",
+        remote_app_data={
+            "database": "hive_metastore_db",
+            "endpoints": "example.com:5432",
+            "secret-tls": tls_secret.id,
+            "secret-user": user_secret.id,
+        },
+    )
     state_in = testing.State(
         containers={container},
-        config={"log-level": "debug"},  # This is the config the charmer passed with `juju config`
+        relations={relation},
+        secrets={
+            user_secret,
+            tls_secret,
+        },
+        leader=True,
     )
 
     # Act:
-    state_out = ctx.run(ctx.on.config_changed(), state_in)
+    state_out = ctx.run(ctx.on.relation_changed(relation), state_in)
 
     # Assert:
-    updated_plan = state_out.get_container(container.name).plan
-    gunicorn_args = updated_plan.services["httpbin"].environment["GUNICORN_CMD_ARGS"]
-    assert gunicorn_args == "--log-level debug"
+    assert len(ctx.exec_history["hive-metastore"]) == 2
     assert state_out.unit_status == testing.ActiveStatus()
-
-
-def test_config_changed_valid_cannot_connect():
-    """Test a config-changed event when the config is valid but the container cannot be reached.
-
-    We expect to end up in MaintenanceStatus waiting for the deferred event to
-    be retried.
-    """
-    # Arrange:
-    ctx = testing.Context(HiveMetastoreK8SOperatorCharm)
-    container = testing.Container("httpbin", can_connect=False)
-    state_in = testing.State(containers={container}, config={"log-level": "debug"})
-
-    # Act:
-    state_out = ctx.run(ctx.on.config_changed(), state_in)
-
-    # Assert:
-    assert isinstance(state_out.unit_status, testing.MaintenanceStatus)
-
-
-def test_config_changed_invalid():
-    """Test a config-changed event when the config is invalid."""
-    # Arrange:
-    ctx = testing.Context(HiveMetastoreK8SOperatorCharm)
-    container = testing.Container("httpbin", can_connect=True)
-    invalid_level = "foobar"
-    state_in = testing.State(containers={container}, config={"log-level": invalid_level})
-
-    # Act:
-    state_out = ctx.run(ctx.on.config_changed(), state_in)
-
-    # Assert:
-    assert isinstance(state_out.unit_status, testing.BlockedStatus)
-    assert invalid_level in state_out.unit_status.message
+    container_fs = state_out.get_container("hive-metastore").get_filesystem(ctx)
+    # Strip the leading slash
+    cfg_file = container_fs / constants.HIVE_SITE_PATH[1:]
+    config = cfg_file.read_text()
+    expected_config = textwrap.dedent("""\
+        <?xml version="1.0" encoding="UTF-8"?>
+        <configuration>
+          <property>
+            <name>javax.jdo.option.ConnectionURL</name>
+            <value>jdbc:postgresql://example.com:5432/hive_metastore_db</value>
+          </property>
+          <property>
+            <name>javax.jdo.option.ConnectionDriverName</name>
+            <value>org.postgresql.Driver</value>
+          </property>
+          <property>
+            <name>javax.jdo.option.ConnectionUserName</name>
+            <value>foo</value>
+          </property>
+          <property>
+            <name>javax.jdo.option.ConnectionPassword</name>
+            <value>bar</value>
+          </property>
+          <property>
+            <name>datanucleus.schema.autoCreateAll</name>
+            <value>false</value>
+          </property>
+          <property>
+            <name>datanucleus.autoCreateSchema</name>
+            <value>false</value>
+          </property>
+          <property>
+            <name>datanucleus.fixedDatastore</name>
+            <value>true</value>
+          </property>
+          <property>
+            <name>hive.metastore.schema.verification</name>
+            <value>false</value>
+          </property>
+          <property>
+            <name>hive.metastore.uris</name>
+            <value>thrift://0.0.0.0:9083</value>
+          </property>
+        </configuration>
+        """)
+    assert config == expected_config

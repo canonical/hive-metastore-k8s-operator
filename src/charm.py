@@ -15,7 +15,7 @@ from charms.data_platform_libs.v0.data_interfaces import (
 )
 from charms.data_platform_libs.v0.data_models import TypedCharmBase
 from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus, WaitingStatus
-from ops.pebble import ChangeError, ConnectionError
+from ops.pebble import APIError, ChangeError, ConnectionError
 
 import constants
 import hive_metastore
@@ -39,7 +39,7 @@ class HiveMetastoreK8SOperatorCharm(TypedCharmBase[CharmConfig]):
             database_name=constants.DEFAULT_DATABASE_NAME,
         )
 
-        framework.observe(self.on[constants.CONTAINER_NAME].pebble_ready, self._on_container_ready)
+        framework.observe(self.on[constants.CONTAINER_NAME].pebble_ready, self._on_pebble_ready)
         framework.observe(self.on.config_changed, self._on_config_changed)
         framework.observe(self.on.update_status, self._on_update_status)
 
@@ -50,14 +50,14 @@ class HiveMetastoreK8SOperatorCharm(TypedCharmBase[CharmConfig]):
 
     # Event handlers -----------------------------------------------------------------
 
-    def _on_container_ready(self, _: ops.PebbleReadyEvent) -> None:
+    def _on_pebble_ready(self, _: ops.PebbleReadyEvent) -> None:
         self._reconcile()
 
-    def _on_config_changed(self, event: ops.ConfigChangedEvent) -> None:
+    def _on_config_changed(self, _: ops.ConfigChangedEvent) -> None:
         self.unit.open_port("tcp", constants.HIVE_PORT)
         self._reconcile()
 
-    def _on_update_status(self, event: ops.UpdateStatusEvent) -> None:
+    def _on_update_status(self, _: ops.UpdateStatusEvent) -> None:
         self._reconcile()
 
     def _on_database_event(
@@ -75,7 +75,6 @@ class HiveMetastoreK8SOperatorCharm(TypedCharmBase[CharmConfig]):
 
     # Reconciliation -----------------------------------------------------------------
 
-    # TODO (mertalpt): Call this from update_status
     def _reconcile(self) -> None:
         # TODO (mertalpt): Check if it would be better to update
         # the pebble plan rather than stopping the service.
@@ -137,7 +136,7 @@ class HiveMetastoreK8SOperatorCharm(TypedCharmBase[CharmConfig]):
             self.unit.status = WaitingStatus("waiting for pebble service")
             return
 
-        container.autostart()
+        container.replan()
         self.unit.status = ActiveStatus()
 
     # Helpers ------------------------------------------------------------------------
@@ -151,7 +150,6 @@ class HiveMetastoreK8SOperatorCharm(TypedCharmBase[CharmConfig]):
     def _apply_pebble_layer(self, container: ops.Container) -> None:
         desired_layer = self._pebble_layer()
         container.add_layer(constants.SERVICE_NAME, desired_layer, combine=True)
-        container.replan()
 
     def _pebble_layer(self) -> ops.pebble.LayerDict:
         environment = self._service_environment()
@@ -191,6 +189,14 @@ class HiveMetastoreK8SOperatorCharm(TypedCharmBase[CharmConfig]):
         # rather than permission here.
         try:
             container.stop(constants.SERVICE_NAME)
+        except APIError as e:
+            if (
+                e.message
+                == f"cannot stop services: service {constants.SERVICE_NAME} does not exist"
+            ):
+                pass
+            else:
+                raise
         except (ConnectionError, ChangeError) as e:
             logger.debug("Failed to stop service: %s", e)
 

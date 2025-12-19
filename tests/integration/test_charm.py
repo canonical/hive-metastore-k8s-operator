@@ -24,7 +24,9 @@ async def test_build_and_deploy(ops_test: OpsTest):
     """
     # Build and deploy charm from local source folder
     charm = await ops_test.build_charm(".")
-    resources = {"hive-metastore-image": METADATA["resources"]["hive-metastore-image"]["upstream-source"]}
+    resources = {
+        "hive-metastore-image": METADATA["resources"]["hive-metastore-image"]["upstream-source"]
+    }
 
     # Deploy the charm and wait for blocked/idle status
     await asyncio.gather(

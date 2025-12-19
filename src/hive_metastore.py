@@ -110,7 +110,7 @@ class PostgresRelationModel(pydantic.BaseModel):
             except json.JSONDecodeError:
                 ret = v
 
-            if not v.startswith("secret://"):
+            if not v.startswith("secret:"):
                 return ret
 
             secret = charm.model.get_secret(id=v)
