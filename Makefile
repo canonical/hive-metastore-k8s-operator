@@ -37,7 +37,9 @@ help:
 	@echo "  build             Build both charm and rock"
 	@echo "  build-charm       Build the charm using charmcraft"
 	@echo "  build-rock        Build the OCI archive (rock) using rockcraft"
-	@echo "  check-deps        Check if necessary dependencies are installed"
+	@echo "  check-build-deps  Check if necessary dependencies for building are installed"
+	@echo "  check-deploy-deps Check if necessary dependencies for deploying are installed"
+	@echo "  check-deps        Check if all dependencies are installed"
 	@echo "  checks            Run all the code quality checks"
 	@echo "  clean             Remove built charm and rock files"
 	@echo "  clean-charmcraft  Clean charmcraft environment"
@@ -56,13 +58,23 @@ help:
 .PHONY: build
 build: build-charm build-rock
 
-.PHONY: check-deps
-check-deps:
+.PHONY: check-build-deps
+check-build-deps:
 	@which yq >/dev/null || (echo "yq not found" && exit 1)
+	@which uv >/dev/null || (echo "uv not found" && exit 1)
 	@which charmcraft >/dev/null || (echo "charmcraft not found" && exit 1)
 	@which rockcraft >/dev/null || (echo "rockcraft not found" && exit 1)
-	@which juju >/dev/null || (echo "juju not found" && exit 1)
 	@which tox >/dev/null || (echo "tox not found" && exit 1)
+
+.PHONY: check-deploy-deps
+check-deploy-deps:
+	@which juju >/dev/null || (echo "juju not found" && exit 1)
+	@which docker >/dev/null || (echo "docker not found" && exit 1)
+	@which microk8s >/dev/null || (echo "microk8s not found" && exit 1)
+	@which skopeo >/dev/null || (echo "skopeo not found" && exit 1)
+
+.PHONY: check-deps
+check-deps: check-build-deps check-deploy-deps
 
 .PHONY: checks
 checks: fmt lint test
