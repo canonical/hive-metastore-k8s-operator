@@ -90,7 +90,11 @@ class HiveMetastoreK8SOperatorCharm(TypedCharmBase[CharmConfig]):
             self.unit.status = BlockedStatus("waiting for postgresql relation")
             return
 
-        pg_relation = raw_pg_relation.load(hive_metastore.PostgresRelationModel, raw_pg_relation.app, decoder=hive_metastore.PostgresRelationModel.decode(self))
+        pg_relation = raw_pg_relation.load(
+            hive_metastore.PostgresRelationModel,
+            raw_pg_relation.app,
+            decoder=hive_metastore.PostgresRelationModel.decode(self),
+        )
 
         # Check if a configuration update is needed.
         try:
@@ -179,7 +183,7 @@ class HiveMetastoreK8SOperatorCharm(TypedCharmBase[CharmConfig]):
         """Stop the Hive Metastore service in the given container.
 
         :param self: Self.
-        :param container: Container in which the service will be stoped.
+        :param container: Container in which the service will be stopped.
         :type container: ops.Container
         """
         # Documentation is unclear on failure scenarios

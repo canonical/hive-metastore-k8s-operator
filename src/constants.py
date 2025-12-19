@@ -1,6 +1,8 @@
 # Copyright 2025 Canonical Ltd.
 # See LICENSE file for licensing details.
 
+"""Module to store constants for the charm."""
+
 CONTAINER_NAME = "hive-metastore"
 SERVICE_NAME = "hive-metastore"
 DEFAULT_DATABASE_NAME = "hive_metastore"

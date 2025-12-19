@@ -4,7 +4,7 @@
 """Hive Metastore related logic."""
 
 import json
-from typing import Any, Callable, Optional
+from typing import Callable, Optional
 from xml.sax.saxutils import escape
 
 import ops
@@ -23,40 +23,84 @@ class PostgresRelationModel(pydantic.BaseModel):
 
     @property
     def host(self) -> str:
+        """Host for the database primary.
+
+        :param self: Self.
+        :return: Host value for the database primary.
+        :rtype: str
+        """
         val = self.endpoints.split(",")[0]
         host, _ = val.split(":", 1)
         return host
 
     @property
     def port(self) -> str:
+        """Port for the database primary.
+
+        :param self: Self.
+        :return: Port value for the database primary.
+        :rtype: str
+        """
         val = self.endpoints.split(",")[0]
         _, port = val.split(":", 1)
         return port
 
     @property
     def username(self) -> str:
+        """Username for the database server.
+
+        :param self: Self.
+        :return: Username of the relation user.
+        :rtype: str
+        """
         return self.secret_user["username"]
 
     @property
     def password(self) -> str:
+        """Password for the database server.
+
+        :param self: Self.
+        :return: Password of the relation user.
+        :rtype: str
+        """
         return self.secret_user["password"]
 
     @property
     def tls(self) -> bool:
+        """Whether the database server implements TLS.
+
+        :param self: Self.
+        :return: True if the database server implements TLS, false otherwise.
+        :rtype: bool
+        """
         return self.secret_tls["tls"].lower() == "true"
 
     @property
     def tls_ca(self) -> Optional[str]:
-        return self.secret_tls.get("tls-ca") 
+        """Certificate of the certificate authority used for TLS.
+
+        :param self: Self.
+        :return: If exists, the CA certificate used for the TLS certificate.
+        :rtype: str | None
+        """
+        return self.secret_tls.get("tls-ca")
 
     @classmethod
     def decode(cls, charm: ops.CharmBase) -> Callable[[str], str | dict[str, str]]:
-        def _decode(v: str) -> str | dict[str, str]:
-            """Decoder method for 'ops.Relation.load' that accommodates
-            Postgres databag is a mix of json dumps and plain strings.
-        
+        """Generate a decoder for Postgres databag that normalizes JSON and fetches secrets.
+
+        :param cls: Class.
+        :param charm: Charm object that consumes Postgres.
+        :type charm: ops.CharmBase
+        :return: A function that decodes the Postgres databag key-value pairs.
+        :rtype: Callable[[str], str | dict[str, str]]
+        """
+
+        def wrapped(v: str) -> str | dict[str, str]:
+            """Decode contents of the Postgres databag.
+
             :param cls: Description
-            :param v: Value to decode.
+            :param v: Raw value from Postgres databag.
             :type v: str
             :return: Decoded string.
             :rtype: Any
@@ -68,15 +112,26 @@ class PostgresRelationModel(pydantic.BaseModel):
 
             if not v.startswith("secret://"):
                 return ret
-            
+
             secret = charm.model.get_secret(id=v)
             content = secret.get_content(refresh=True)
             return content
-        
-        return _decode
+
+        return wrapped
 
 
-def manage_configuration_files(container: ops.Container, pg_relation: PostgresRelationModel) -> bool:
+def manage_configuration_files(
+    container: ops.Container, pg_relation: PostgresRelationModel
+) -> bool:
+    """Render and organize configuration files in the container filesystem.
+
+    :param container: Container in which files will be managed.
+    :type container: ops.Container
+    :param pg_relation: Object to use for Postgres credentials.
+    :type pg_relation: PostgresRelationModel
+    :return: True if there has been a change in files, false otherwise.
+    :rtype: bool
+    """
     has_changed = False
 
     try:

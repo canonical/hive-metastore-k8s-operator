@@ -1,5 +1,12 @@
 # Copyright 2025 Canonical Ltd.
 # See LICENSE file for licensing details.
+
+# Pydantic validators take class as first value
+# which causes a false positive with ruff for N805.
+# ruff: noqa: N805
+
+"""Module for a Pydantic model that is used for the charm configuration."""
+
 import re
 import shlex
 from typing import Any
@@ -28,8 +35,8 @@ class CharmConfig(BaseConfigModel):
     sql_connection_pool_max_size: int
 
     @validator("additional_jvm_options", pre=True)
-    def validate_jvm_options(cls, v: Any) -> list[str]:
-        """Parses and validates the input into a list of JVM options.
+    def validate_jvm_options(cls, v: Any) -> list[str]:  # noqa: C901
+        """Parse the input into a list of JVM options.
 
         Expects a string of JVM options as if they are passed to `java`
         in the shell.
@@ -89,7 +96,7 @@ class CharmConfig(BaseConfigModel):
 
     @validator("hms_min_threads", "hms_max_threads", "sql_connection_pool_max_size", pre=True)
     def validate_positive_ints(cls, v: Any) -> int:
-        """Parses and validates the input into a positive integer.
+        """Parse the input into a positive integer.
 
         :param cls: Class.
         :param v: Value to validate.
@@ -110,9 +117,8 @@ class CharmConfig(BaseConfigModel):
         return v
 
     @validator("kubernetes_requests", "kubernetes_limits", pre=True)
-    def validate_kubernetes_resources(cls, v: Any) -> dict[str, str]:
-        """Parses and validates the input into a dictionary that maps
-        Kubernetes resources types to allocation.
+    def validate_kubernetes_resources(cls, v: Any) -> dict[str, str]:  # noqa: C901
+        """Parse input into a map of Kubernetes resources types to allocation.
 
         Expects comma separated `key=value` pairs where key is 'cpu' or 'memory'.
 
