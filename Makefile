@@ -1,8 +1,6 @@
 # Variables for paths and configuration
 
-# Get absolute path to root independent of working directory
-MKFILE_PATH := $(abspath $(lastword $(MAKEFILE_LIST)))
-PROJECT_ROOT := $(patsubst %/,%,$(dir $(MKFILE_PATH)))
+PROJECT_ROOT := $(CURDIR)
 
 # Shell strict mode
 SHELL := /bin/bash
@@ -53,6 +51,7 @@ help:
 	@echo "  test-static       Run static type checks"
 	@echo "  test-unit         Run unit tests"
 	@echo "  help              Show this help message"
+	@echo "  venv              Create a virtual environment"
 
 .PHONY: build
 build: build-charm build-rock
@@ -130,3 +129,8 @@ build-rock: $(ROCK_FILE)
 import-rock: $(ROCK_FILE)
 	@echo "Importing rock $(ROCK_FILE)..."
 	$(IMPORT_SCRIPT) $(ROCK_FILE) $(ROCK_NAME) $(ROCK_VERSION)
+
+.PHONY: venv
+venv:
+	uv venv --clear venv
+	uv sync --active --group charmlibs-pydeps --group unit --group integration
