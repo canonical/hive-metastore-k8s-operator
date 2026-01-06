@@ -425,6 +425,7 @@ name = "hive-metastore-k8s-operator"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
+    { name = "jinja2" },
     { name = "ops" },
     { name = "pydantic" },
 ]
@@ -456,6 +457,7 @@ unit = [
 
 [package.metadata]
 requires-dist = [
+    { name = "jinja2", specifier = ">=3.1.6,<4" },
     { name = "ops", specifier = ">=3.4.0,<4" },
     { name = "pydantic", specifier = ">=1.10,<2" },
 ]

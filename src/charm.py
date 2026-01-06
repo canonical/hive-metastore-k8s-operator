@@ -113,7 +113,9 @@ class HiveMetastoreK8SOperatorCharm(TypedCharmBase[CharmConfig]):
             if "Failed to get schema version" not in err_text:
                 logger.error("Failed to fetch schema version: %s", err_text)
                 self._stop_service(container)
-                self.unit.status = BlockedStatus("schematool (info) is broken")
+                self.unit.status = BlockedStatus(
+                    "schematool (info) is broken; run 'juju debug-log' for details"
+                )
                 return
             # This means schema needs to be initialized.
             do_init, do_restart = True, True
@@ -127,7 +129,9 @@ class HiveMetastoreK8SOperatorCharm(TypedCharmBase[CharmConfig]):
                 res = schematool.initialize(container, env)
             except schematool.SchemaInitializationError as e:
                 logger.error("Failed to initialize metastore schema: %s", str(e))
-                self.unit.status = BlockedStatus("schematool (initSchema) is broken")
+                self.unit.status = BlockedStatus(
+                    "schematool (initSchema) is broken; run 'juju debug-log' for details"
+                )
                 return
 
         try:
@@ -180,9 +184,8 @@ class HiveMetastoreK8SOperatorCharm(TypedCharmBase[CharmConfig]):
     def _stop_service(self, container: ops.Container) -> None:
         """Stop the Hive Metastore service in the given container.
 
-        :param self: Self.
-        :param container: Container in which the service will be stopped.
-        :type container: ops.Container
+        Args:
+            container: Container in which the service will be stopped.
         """
         # Documentation is unclear on failure scenarios
         # but I think it is OK to ask for forgiveness

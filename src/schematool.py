@@ -27,12 +27,12 @@ class SchematoolOperation:
 def initialize(container: ops.Container, environment: dict[str, Any]) -> SchematoolOperation:
     """Run the `initialize` option for the `schematool` command.
 
-    :param container: Container in which the command will be run.
-    :type container: ops.Container
-    :param environment: Environment to run the command with.
-    :type environment: dict[str, Any]
-    :return: The result and the output of the command.
-    :rtype: SchematoolOperation
+    Args:
+        container: Container in which the command will be run.
+        environment: Environment to run the command with.
+
+    Returns:
+        The result and the output of the command.
     """
     command = [
         constants.SCHEMATOOL_PATH,
@@ -61,12 +61,12 @@ def initialize(container: ops.Container, environment: dict[str, Any]) -> Schemat
 def info(container: ops.Container, environment: dict[str, Any]) -> SchematoolOperation:
     """Run the `info` option for the `schematool` command.
 
-    :param container: Container in which the command will be run.
-    :type container: ops.Container
-    :param environment: Environment to run the command with.
-    :type environment: dict[str, Any]
-    :return: The result and the output of the command.
-    :rtype: SchematoolOperation
+    Args:
+        container: Container in which the command will be run.
+        environment: Environment to run the command with.
+
+    Returns:
+        The result and the output of the command.
     """
     command = [
         constants.SCHEMATOOL_PATH,

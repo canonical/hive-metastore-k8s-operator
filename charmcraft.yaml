@@ -68,21 +68,22 @@ config:
       default: 10
       description: Maximum size of the SQL connection pool to the backend database.
 
-actions:
-  clear-init-flag:
-    description: Clear the initialization flag to recover from a broken state.
-
-  restart:
-    description: Restart the Hive Metastore service.
-
-  restore-schema-dirs:
-    description: Restore the Hive Metastore schema directories from backend database.
-
-  schematool-info:
-    description: Runs `schematool` with `info` option to display versions.
-
-  schematool-validate:
-    description: Runs `schematool` with `validate` option to validate the metadata.
+# To be implemented later.
+# actions:
+#   clear-init-flag:
+#     description: Clear the initialization flag to recover from a broken state.
+# 
+#   restart:
+#     description: Restart the Hive Metastore service.
+# 
+#   restore-schema-dirs:
+#     description: Restore the Hive Metastore schema directories from backend database.
+# 
+#   schematool-info:
+#     description: Runs `schematool` with `info` option to display versions.
+# 
+#   schematool-validate:
+#     description: Runs `schematool` with `validate` option to validate the metadata.
 
 storage:
   hive-metastore-warehouse:

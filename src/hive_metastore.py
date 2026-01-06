@@ -4,11 +4,12 @@
 """Hive Metastore related logic."""
 
 import json
+import textwrap
 from typing import Callable, Optional
-from xml.sax.saxutils import escape
 
 import ops
 import pydantic
+from jinja2 import Template
 
 import constants
 
@@ -25,9 +26,8 @@ class PostgresRelationModel(pydantic.BaseModel):
     def host(self) -> str:
         """Host for the database primary.
 
-        :param self: Self.
-        :return: Host value for the database primary.
-        :rtype: str
+        Returns:
+            Host value for the database primary.
         """
         val = self.endpoints.split(",")[0]
         host, _ = val.split(":", 1)
@@ -37,9 +37,8 @@ class PostgresRelationModel(pydantic.BaseModel):
     def port(self) -> str:
         """Port for the database primary.
 
-        :param self: Self.
-        :return: Port value for the database primary.
-        :rtype: str
+        Returns:
+            Port value for the database primary.
         """
         val = self.endpoints.split(",")[0]
         _, port = val.split(":", 1)
@@ -49,9 +48,8 @@ class PostgresRelationModel(pydantic.BaseModel):
     def username(self) -> str:
         """Username for the database server.
 
-        :param self: Self.
-        :return: Username of the relation user.
-        :rtype: str
+        Returns:
+            Username of the relation user.
         """
         return self.secret_user["username"]
 
@@ -59,9 +57,8 @@ class PostgresRelationModel(pydantic.BaseModel):
     def password(self) -> str:
         """Password for the database server.
 
-        :param self: Self.
-        :return: Password of the relation user.
-        :rtype: str
+        Returns:
+            Password of the relation user.
         """
         return self.secret_user["password"]
 
@@ -69,9 +66,8 @@ class PostgresRelationModel(pydantic.BaseModel):
     def tls(self) -> bool:
         """Whether the database server implements TLS.
 
-        :param self: Self.
-        :return: True if the database server implements TLS, false otherwise.
-        :rtype: bool
+        Returns:
+            True if the database server implements TLS, false otherwise.
         """
         return self.secret_tls["tls"].lower() == "true"
 
@@ -79,9 +75,8 @@ class PostgresRelationModel(pydantic.BaseModel):
     def tls_ca(self) -> Optional[str]:
         """Certificate of the certificate authority used for TLS.
 
-        :param self: Self.
-        :return: If exists, the CA certificate used for the TLS certificate.
-        :rtype: str | None
+        Returns:
+            If exists, the CA certificate used for the TLS certificate.
         """
         return self.secret_tls.get("tls-ca")
 
@@ -89,21 +84,21 @@ class PostgresRelationModel(pydantic.BaseModel):
     def decode(cls, charm: ops.CharmBase) -> Callable[[str], str | dict[str, str]]:
         """Generate a decoder for Postgres databag that normalizes JSON and fetches secrets.
 
-        :param cls: Class.
-        :param charm: Charm object that consumes Postgres.
-        :type charm: ops.CharmBase
-        :return: A function that decodes the Postgres databag key-value pairs.
-        :rtype: Callable[[str], str | dict[str, str]]
+        Args:
+            charm: Charm object that consumes Postgres.
+
+        Returns:
+            A function that decodes the Postgres databag key-value pairs.
         """
 
         def wrapped(v: str) -> str | dict[str, str]:
             """Decode contents of the Postgres databag.
 
-            :param cls: Description
-            :param v: Raw value from Postgres databag.
-            :type v: str
-            :return: Decoded string.
-            :rtype: Any
+            Args:
+                v: Raw value from Postgres databag.
+
+            Returns:
+                Decoded string.
             """
             try:
                 ret = json.loads(v)
@@ -125,12 +120,12 @@ def manage_configuration_files(
 ) -> bool:
     """Render and organize configuration files in the container filesystem.
 
-    :param container: Container in which files will be managed.
-    :type container: ops.Container
-    :param pg_relation: Object to use for Postgres credentials.
-    :type pg_relation: PostgresRelationModel
-    :return: True if there has been a change in files, false otherwise.
-    :rtype: bool
+    Args:
+        container: Container in which files will be managed.
+        pg_relation: Object to use for Postgres credentials.
+
+    Returns:
+        True if there has been a change in files, false otherwise.
     """
     has_changed = False
 
@@ -160,11 +155,11 @@ def manage_configuration_files(
     return has_changed
 
 
-def _render_hive_site(pg_relation: PostgresRelationModel):
-    """Render `hive-site.xml` configuration file.
+def _render_hive_site(pg_relation: PostgresRelationModel) -> str:
+    """Render `hive-site.xml` configuration file using a Jinja template.
 
-    :param pg_relation: Wrapper for Postgres relation data.
-    :type pg_relation: PostgresRelation
+    Args:
+        pg_relation: Wrapper for Postgres relation data.
     """
     properties = {
         "javax.jdo.option.ConnectionURL": _build_jdbc_url(pg_relation),
@@ -178,33 +173,32 @@ def _render_hive_site(pg_relation: PostgresRelationModel):
         "hive.metastore.uris": f"thrift://0.0.0.0:{constants.HIVE_PORT}",
     }
 
-    lines = [
-        '<?xml version="1.0" encoding="UTF-8"?>',
-        "<configuration>",
-    ]
+    template_str = textwrap.dedent("""\
+        <?xml version="1.0" encoding="UTF-8"?>
+        <configuration>
+        {%- for name, value in properties.items() %}
+          <property>
+            <name>{{ name | e }}</name>
+            <value>{{ value | e }}</value>
+          </property>
+        {%- endfor %}
+        </configuration>
+        """)
 
-    for name, value in properties.items():
-        lines.extend(
-            [
-                "  <property>",
-                f"    <name>{escape(name)}</name>",
-                f"    <value>{escape(str(value))}</value>",
-                "  </property>",
-            ]
-        )
-
-    lines.append("</configuration>")
-    lines.append("")
-    return "\n".join(lines)
+    template = Template(template_str)
+    rendered = template.render(properties=properties)
+    # Ensure trailing newline for compatibility
+    return rendered.rstrip() + "\n"
 
 
 def _build_jdbc_url(pg_relation: PostgresRelationModel) -> str:
     """Build a JDBC URL from Postgres credentials.
 
-    :param pg_relation: Wrapper for Postgres relation data.
-    :type pg_relation: PostgresRelation
-    :return: A JDBC URL to connect to a Postgres database.
-    :rtype: str
+    Args:
+        pg_relation: Wrapper for Postgres relation data.
+
+    Returns:
+        A JDBC URL to connect to a Postgres database.
     """
     base = f"jdbc:postgresql://{pg_relation.host}:{pg_relation.port}/{pg_relation.database}"
 
@@ -225,9 +219,10 @@ def _normalize_ca(text: str) -> str:
 
     Currently does nothing.
 
-    :param text: A CA certificate in PEM format.
-    :type text: str
-    :return: A CA certificate in PEM format that is formatted for Hive Metastore.
-    :rtype: str
+    Args:
+        text: A CA certificate in PEM format.
+
+    Returns:
+        A CA certificate in PEM format that is formatted for Hive Metastore.
     """
     return text

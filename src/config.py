@@ -41,11 +41,11 @@ class CharmConfig(BaseConfigModel):
         Expects a string of JVM options as if they are passed to `java`
         in the shell.
 
-        :param cls: Class.
-        :param v: Value to validate.
-        :type v: Any
-        :return: List of strings where each item is a valid JVM option.
-        :rtype: list[str]
+        Args:
+            v: Value to validate.
+
+        Returns:
+            List of strings where each item is a valid JVM option.
         """
         if v is None:
             return []
@@ -98,11 +98,11 @@ class CharmConfig(BaseConfigModel):
     def validate_positive_ints(cls, v: Any) -> int:
         """Parse the input into a positive integer.
 
-        :param cls: Class.
-        :param v: Value to validate.
-        :type v: Any
-        :return: A positive integer.
-        :rtype: int
+        Args:
+            v: Value to validate.
+
+        Returns:
+            A positive integer.
         """
         try:
             if v is None or isinstance(v, float):
@@ -122,11 +122,11 @@ class CharmConfig(BaseConfigModel):
 
         Expects comma separated `key=value` pairs where key is 'cpu' or 'memory'.
 
-        :param cls: Class.
-        :param v: Value to validate.
-        :type v: Any
-        :return: Dictionary that maps Kubernetes resources to values.
-        :rtype: dict[str, str]
+        Args:
+            v: Value to validate.
+
+        Returns:
+            Dictionary that maps Kubernetes resources to values.
         """
         if v is None:
             return {}
