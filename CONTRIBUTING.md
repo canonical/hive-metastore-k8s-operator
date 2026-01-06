@@ -18,6 +18,8 @@ uv version
 #> uv 0.9.5 (d5f39331a 2025-10-21)
 
 # Tox
+# Note: If you do this from the VSCode snap's integrated terminal
+# you will have a weird PATH. So, do it from an external terminal.
 uv tool install tox --with tox-uv
 tox --version
 #> 4.32.0
@@ -40,6 +42,8 @@ sudo snap install lxd --channel 5.21/stable
 lxd version
 #> 5.21.4 LTS
 
+sudo adduser $USER lxd
+newgrp lxd
 lxd init --auto
 
 # Charmcraft
@@ -54,6 +58,8 @@ rockcraft version
 
 # yq
 sudo snap install yq
+yq --version
+#> yq (https://github.com/mikefarah/yq/) version v4.49.2
 
 # Required by `import_rock.sh`
 sudo snap alias rockcraft.skopeo skopeo

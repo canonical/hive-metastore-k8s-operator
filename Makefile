@@ -65,6 +65,7 @@ check-build-deps:
 	@which charmcraft >/dev/null || (echo "charmcraft not found" && exit 1)
 	@which rockcraft >/dev/null || (echo "rockcraft not found" && exit 1)
 	@which tox >/dev/null || (echo "tox not found" && exit 1)
+	@echo "All build dependencies are installed."
 
 .PHONY: check-deploy-deps
 check-deploy-deps:
@@ -72,6 +73,7 @@ check-deploy-deps:
 	@which docker >/dev/null || (echo "docker not found" && exit 1)
 	@which microk8s >/dev/null || (echo "microk8s not found" && exit 1)
 	@which skopeo >/dev/null || (echo "skopeo not found" && exit 1)
+	@echo "All deployment dependencies are installed."
 
 .PHONY: check-deps
 check-deps: check-build-deps check-deploy-deps
