@@ -8,8 +8,3 @@ __pycache__/
 *.py[cod]
 .idea
 .vscode/
-
-# GH Actions are supposed to fetch the libs from `charmcraft.yaml`.
-# However, having them locally lets IntelliSense work.
-# So we ignore them here but you can fetch them with `charmcraft fetch-libs`.
-lib/
