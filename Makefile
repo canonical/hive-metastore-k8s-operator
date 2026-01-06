@@ -1,3 +1,6 @@
+# Copyright 2025 Canonical Ltd.
+# See LICENSE file for licensing details.
+
 # Variables for paths and configuration
 
 PROJECT_ROOT := $(CURDIR)

@@ -1,3 +1,6 @@
+# Copyright 2025 Canonical Ltd.
+# See LICENSE file for licensing details.
+
 name: hive-metastore
 base: ubuntu@24.04
 version: '3.0.0'
