@@ -1,0 +1,39 @@
+header:
+  license:
+    spdx-id: Apache-2.0
+    copyright-owner: Canonical Ltd.
+    content: |
+      Copyright 2025 [owner]
+      See LICENSE file for licensing details.
+  paths:
+    - '**'
+  paths-ignore:
+    - '.github/files/**'
+    - '**/*.j2'
+    - '**/*.json'
+    - '**/*.md'
+    - '**/*.txt'
+    - '**/*.xml'
+    - '**/.codespellignore'
+    - '**/.dockerignore'
+    - '**/.flake8'
+    - '**/.jujuignore'
+    - '**/.gitignore'
+    - '**/.licenserc.yaml'
+    - '**/.trivyignore'
+    - '**/.woke.yaml'
+    - '**/.woke.yml'
+    - '**/CODEOWNERS'
+    - '**/icon.svg'
+    - '**/LICENSE'
+    - '**/trivy.yaml'
+    - '.eslintignore'
+    - '.gitattributes'
+    - '.node-version'
+    - '.prettierignore'
+    - 'dist/**'
+    - 'internal/**'
+    - 'tests/workflows/integration/**'
+    - 'uv.lock'
+    - '.python-version'
+  comment: on-failure
