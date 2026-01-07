@@ -2,8 +2,10 @@ header:
   license:
     spdx-id: Apache-2.0
     copyright-owner: Canonical Ltd.
+    # License year is supposed to be the year where a file is first created.
+    # But the workflow does not check it correctly, so we change the pattern.
     content: |
-      Copyright 2025 [owner]
+      Copyright \d{4} [owner]
       See LICENSE file for licensing details.
   paths:
     - '**'

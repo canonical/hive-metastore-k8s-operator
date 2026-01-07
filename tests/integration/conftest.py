@@ -7,6 +7,7 @@ import pathlib
 import subprocess
 import sys
 import time
+from collections.abc import Generator
 
 import jubilant
 import pytest
@@ -14,8 +15,14 @@ import pytest
 logger = logging.getLogger(__name__)
 
 
+def pytest_addoption(parser: pytest.Parser) -> None:
+    """Add options to the pytest configuration."""
+    parser.addoption("--charm-file", action="store")
+    parser.addoption("--hive-metastore-image", action="store")
+
+
 @pytest.fixture(scope="module")
-def juju(request: pytest.FixtureRequest):
+def juju(request: pytest.FixtureRequest) -> Generator[jubilant.Juju, None, None]:
     """Create a temporary Juju model for running tests."""
     with jubilant.temp_model() as juju:
         yield juju
@@ -28,8 +35,15 @@ def juju(request: pytest.FixtureRequest):
 
 
 @pytest.fixture(scope="session")
-def charm():
+def charm(request: pytest.FixtureRequest) -> pathlib.Path:
     """Return the path of the charm under test."""
+    charm_file = request.config.getoption("--charm-file")
+    if charm_file:
+        path = pathlib.Path(charm_file)
+        if not path.exists():
+            raise FileNotFoundError(f"Charm does not exist: {path}")
+        return path
+
     if "CHARM_PATH" in os.environ:
         charm_path = pathlib.Path(os.environ["CHARM_PATH"])
         if not charm_path.exists():
@@ -53,3 +67,9 @@ def charm():
         raise FileNotFoundError("Charm not found after build.")
 
     return charms[0]
+
+
+@pytest.fixture(scope="session")
+def hive_metastore_image(request: pytest.FixtureRequest) -> str | None:
+    """Return the image path for hive-metastore."""
+    return request.config.getoption("--hive-metastore-image")
