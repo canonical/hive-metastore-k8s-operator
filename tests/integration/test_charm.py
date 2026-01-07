@@ -18,11 +18,14 @@ def test_deploy(
 
     Assert on the unit status before any relations/configurations take place.
     """
-    resources = {name: res["upstream-source"] for name, res in METADATA["resources"].items()}
+    resources = {}
+    for name, res in METADATA["resources"].items():
+        if _res := res.get("upstream-source"):
+            resources[name] = _res
     if hive_metastore_image:
         resources["hive-metastore-image"] = hive_metastore_image
 
-    juju.deploy(f"./{charm}", resources=resources, application_name=APP_NAME)
+    juju.deploy(f"./{charm}", app=APP_NAME, resources=resources)
 
     # Wait for the application to be blocked (since it's missing relations)
     juju.wait(jubilant.all_blocked, timeout=1000)
