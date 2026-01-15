@@ -1,7 +1,1 @@
 scan:
-  skip-files:
-  # Hadoop/Hive binaries are full of CVEs.
-  # This is to test the pipeline and should not make it into production
-  # unless otherwise approved!
-  #  - "**/*.jar"
-  #  - "**/*.war"

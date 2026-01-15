@@ -8,6 +8,7 @@ import logging
 from typing import Optional
 
 import ops
+import yaml
 from charms.data_platform_libs.v0.data_interfaces import (
     DatabaseCreatedEvent,
     DatabaseEndpointsChangedEvent,
@@ -15,7 +16,7 @@ from charms.data_platform_libs.v0.data_interfaces import (
 )
 from charms.data_platform_libs.v0.data_models import TypedCharmBase
 from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus, WaitingStatus
-from ops.pebble import APIError, ChangeError, ConnectionError
+from ops.pebble import APIError, ChangeError, ConnectionError, PathError
 
 import constants
 import hive_metastore
@@ -51,6 +52,15 @@ class HiveMetastoreK8SOperatorCharm(TypedCharmBase[CharmConfig]):
     # Event handlers -----------------------------------------------------------------
 
     def _on_pebble_ready(self, _: ops.PebbleReadyEvent) -> None:
+        container = self._get_container()
+        if container is not None and container.can_connect():
+            try:
+                meta_file = container.pull("/rockcraft.yaml")
+                meta = yaml.safe_load(meta_file)
+                if meta and "version" in meta:
+                    self.unit.set_workload_version(meta["version"])
+            except (PathError, yaml.YAMLError) as e:
+                logger.debug("Could not get workload version: %s", str(e))
         self._reconcile()
 
     def _on_config_changed(self, _: ops.ConfigChangedEvent) -> None:
@@ -175,7 +185,7 @@ class HiveMetastoreK8SOperatorCharm(TypedCharmBase[CharmConfig]):
         return {
             "HIVE_HOME": "/opt/hive",
             "HADOOP_HOME": "/opt/hadoop",
-            "JAVA_HOME": "/usr/lib/jvm/java-8-openjdk-amd64",
+            "JAVA_HOME": "/usr/lib/jvm/java-21-openjdk-amd64",
             "HIVE_CONF_DIR": constants.HIVE_CONF_DIR,
             "HADOOP_CONF_DIR": constants.HIVE_CONF_DIR,
             "PATH": "/opt/hadoop/bin:/opt/hive/bin:/usr/bin:/bin",

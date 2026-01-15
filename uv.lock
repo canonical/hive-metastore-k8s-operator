@@ -428,6 +428,7 @@ dependencies = [
     { name = "jinja2" },
     { name = "ops" },
     { name = "pydantic" },
+    { name = "pyyaml" },
 ]
 
 [package.dev-dependencies]
@@ -460,6 +461,7 @@ requires-dist = [
     { name = "jinja2", specifier = ">=3.1.6,<4" },
     { name = "ops", specifier = ">=3.4.0,<4" },
     { name = "pydantic", specifier = ">=1.10,<2" },
+    { name = "pyyaml", specifier = ">=6.0.3" },
 ]
 
 [package.metadata.requires-dev]

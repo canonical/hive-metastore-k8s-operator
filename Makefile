@@ -24,6 +24,9 @@ ROCK_NAME := $(shell yq '.name' $(ROCKCRAFT_YAML))
 ROCK_VERSION := $(shell yq '.version' $(ROCKCRAFT_YAML))
 ROCK_ARCH := amd64
 
+# Tag for local deployment to bypass caching
+LOCAL_ROCK_TAG := $(ROCK_VERSION)-$(shell date +%s)
+
 # The expected output files from charmcraft/rockcraft pack
 CHARM_FILE := $(PROJECT_ROOT)/$(CHARM_NAME)_$(CHARM_ARCH).charm
 ROCK_FILE := $(ROCK_DIR)/$(ROCK_NAME)_$(ROCK_VERSION)_$(ROCK_ARCH).rock
@@ -103,7 +106,7 @@ clean-rockcraft:
 .PHONY: deploy-local
 deploy-local:
 	@echo "Deploying charm with local resources..."
-	juju deploy $(CHARM_FILE) --resource hive-metastore-image=$(REGISTRY)/$(ROCK_NAME):$(ROCK_VERSION)
+	juju deploy $(CHARM_FILE) --resource hive-metastore-image=$(REGISTRY)/$(ROCK_NAME):latest
 
 .PHONY: fmt
 fmt:
@@ -145,7 +148,7 @@ build-rock: $(ROCK_FILE)
 .PHONY: import-rock
 import-rock: $(ROCK_FILE)
 	@echo "Importing rock $(ROCK_FILE)..."
-	$(IMPORT_SCRIPT) $(ROCK_FILE) $(ROCK_NAME) $(ROCK_VERSION)
+	$(IMPORT_SCRIPT) $(ROCK_FILE) $(ROCK_NAME) $(ROCK_VERSION) --latest
 
 .PHONY: venv
 venv:

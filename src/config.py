@@ -86,7 +86,7 @@ class CharmConfig(BaseConfigModel):
 
             if opt.startswith("-D"):
                 if "=" not in opt:
-                    pass
+                    continue
 
                 key = opt[2:].split("=")[0]
                 if not key:

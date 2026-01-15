@@ -9,7 +9,7 @@ This charm is designed to provide a Hive-compatible metadata service, particular
 The Hive Metastore service stores the metadata for Hive tables and partitions in a relational database, and provides clients (including Hive, Impala, Trino, and Spark) access to this information via the Metastore Service API.
 
 This operator manages the lifecycle of the Hive Metastore on Kubernetes, handling:
-- Deployment of the Hive Metastore service (version 3.0.0).
+- Deployment of the Hive Metastore service.
 - Configuration of the service and connection to the backend database.
 - Integration with PostgreSQL using the `postgresql_client` interface.
 - Day-2 operations like restarting the service or running schema validation tools.

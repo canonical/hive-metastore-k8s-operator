@@ -99,7 +99,6 @@ containers:
     resource: hive-metastore-image
     mounts:
       - storage: hive-metastore-warehouse
-        # TODO (mertalpt): Verify and use
         location: /user/hive/warehouse
 
 resources:

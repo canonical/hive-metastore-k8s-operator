@@ -110,7 +110,7 @@ You can install the dependencies with:
 
 ```shell
 # Juju
-sudo snap install juju --channel 3.6/stable
+sudo snap install juju --channel 3/stable
 juju version
 #> 3.6.12-genericlinux-amd64
 
@@ -149,4 +149,10 @@ You can deploy `hive-metastore` using local artifacts with:
 
 ```shell
 make deploy-local
+```
+
+It is recommended to change the logging configuration when working with deployments:
+
+```shell
+juju model-config logging-config="<root>=INFO;unit=DEBUG"
 ```
