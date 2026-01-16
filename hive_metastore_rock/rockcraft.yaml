@@ -1,0 +1,82 @@
+# Copyright 2025 Canonical Ltd.
+# See LICENSE file for licensing details.
+
+name: hive-metastore
+base: ubuntu@24.04
+version: '4.2.0'
+summary: "Apache Hive Metastore 4.2.0 Rock"
+description: "OCI image for Hive Metastore service."
+platforms:
+    amd64:
+
+parts:
+  # ---- Metadata ----  
+  rock-source:
+    plugin: dump
+    source: .
+    organize:
+      rockcraft.yaml: rockcraft.yaml
+    stage:
+      - rockcraft.yaml
+
+  # ---- Base Packages ----
+  base-packages:
+    plugin: nil
+    overlay-packages:
+      - curl
+      - vim
+  
+  # ---- Java Runtime ----
+  java:
+    plugin: nil
+    overlay-packages:
+      - openjdk-21-jre-headless
+
+  # ---- Hadoop Binaries (Required by Hive) ----
+  hadoop:
+    plugin: dump
+    source: https://dlcdn.apache.org/hadoop/common/hadoop-3.4.1/hadoop-3.4.1.tar.gz
+    source-checksum: sha512/09cda6943625bc8e4307deca7a4df76d676a51aca1b9a0171938b793521dfe1ab5970fdb9a490bab34c12a2230ffdaed2992bad16458169ac51b281be1ab6741
+    organize:
+      "*": opt/hadoop/
+    stage:
+      - opt/hadoop
+
+  # ---- Hive Metastore ----
+  hive:
+    plugin: dump
+    source: https://dlcdn.apache.org/hive/hive-standalone-metastore-4.2.0/hive-standalone-metastore-4.2.0-bin.tar.gz
+    source-checksum: sha256/713b2099c1fcc07125082963d109c011f20a937650b4e89ccb9e914bc9efc437
+    organize:
+      "*": opt/hive/
+    stage:
+      - opt/hive
+
+  # ---- PostgreSQL JDBC Driver ----
+  postgres-jdbc:
+    after:
+      - hive
+    plugin: dump
+    source: https://jdbc.postgresql.org/download/postgresql-42.7.7.jar
+    source-checksum: sha512/3383843ca60f29c796056421211b81752177bc89f85b7c513f6289895d33614bbf4908db4c6c9236ff31236a95a1120e91038666c59b6929a08f2d26ec6d1dc4
+    source-type: file
+    organize:
+      "postgresql-42.7.7.jar": opt/hive/lib/postgresql-42.7.7.jar
+    stage:
+      - opt/hive/lib/postgresql-42.7.7.jar
+
+# ---- Service Definition ----
+services:
+  hive-metastore:
+    override: replace
+    command: "/opt/hive/bin/start-metastore"
+    startup: enabled
+    environment:
+      HIVE_HOME: "/opt/hive"
+      HADOOP_HOME: "/opt/hadoop"
+      JAVA_HOME: "/usr/lib/jvm/java-21-openjdk-amd64"
+      # Tell Hive/Hadoop to look for config in this dir,
+      # which is where the charm will mount its configuration.
+      HIVE_CONF_DIR: "/etc/hive-conf"
+      HADOOP_CONF_DIR: "/etc/hive-conf"
+      PATH: "/opt/hadoop/bin:/opt/hive/bin:$PATH"

@@ -1,0 +1,25 @@
+# Copyright 2025 Canonical Ltd.
+# See LICENSE file for licensing details.
+
+name: Integration tests
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+on:
+  pull_request:
+  workflow_call:
+
+jobs:
+  integration-tests:
+    uses: canonical/operator-workflows/.github/workflows/integration_test.yaml@main
+    secrets: inherit
+    with:
+      channel: 1.34-strict/stable
+      modules: '["test_charm.py"]'
+      juju-channel: 3/stable
+      self-hosted-runner: true
+      microk8s-addons: "hostpath-storage registry"
+      trivy-severity-config: CRITICAL
+      with-uv: true

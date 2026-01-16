@@ -1,3 +1,52 @@
+# Copyright 2025 Canonical Ltd.
+# See LICENSE file for licensing details.
+
+[project]
+name = "hive-metastore-k8s-operator"
+version = "0.1.0"
+requires-python = ">=3.12"
+
+dependencies = [
+    "jinja2>=3.1.6,<4",
+    "ops>=3.4.0,<4",
+    "pydantic>=1.10,<2",
+    "pyyaml>=6.0.3",
+]
+
+[dependency-groups]
+# Dependencies for PYDEPS of charm libraries
+charmlibs-pydeps = [
+    "ops>=2.0.0",
+    "pydantic>=1.10,<2",
+]
+
+# Dependencies for linting and type checks
+lint = [
+    "ruff",
+    "codespell",
+    "pyright",
+]
+
+# Dependencies for static analysis
+static = [
+    "bandit[toml]",
+]
+
+# Dependencies for unit tests
+unit = [
+    "coverage[toml]",
+    "ops[testing]",
+    "pytest",
+]
+
+# Dependencies for integration tests
+integration = [
+    "jubilant",
+    "pydantic",
+    "pytest",
+    "pytest-operator",
+]
+
 # Testing tools configuration
 [tool.coverage.run]
 branch = true
@@ -28,8 +77,8 @@ lint.extend-ignore = [
     "D409",
     "D413",
 ]
-extend-exclude = ["__pycache__", "*.egg_info"]
 lint.per-file-ignores = {"tests/*" = ["D100","D101","D102","D103","D104"]}
+extend-exclude = ["__pycache__", "*.egg_info"]
 
 [tool.ruff.lint.mccabe]
 max-complexity = 10
@@ -39,3 +88,4 @@ skip = "build,lib,venv,icon.svg,.tox,.git,.mypy_cache,.ruff_cache,.coverage"
 
 [tool.pyright]
 include = ["src/**.py"]
+extraPaths = ["lib"]  # get language server for libs

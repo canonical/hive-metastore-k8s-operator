@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+{%- for name, value in properties.items() %}
+  <property>
+    <name>{{ name | e }}</name>
+    <value>{{ value | e }}</value>
+  </property>
+{%- endfor %}
+</configuration>

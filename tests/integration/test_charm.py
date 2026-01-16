@@ -1,35 +1,53 @@
 #!/usr/bin/env python3
-# Copyright 2025 Mert Alp Taytak
+# Copyright 2025 Canonical Ltd.
 # See LICENSE file for licensing details.
 
-import asyncio
-import logging
-from pathlib import Path
+import pathlib
 
-import pytest
+import jubilant
 import yaml
-from pytest_operator.plugin import OpsTest
 
-logger = logging.getLogger(__name__)
-
-METADATA = yaml.safe_load(Path("./charmcraft.yaml").read_text())
+METADATA = yaml.safe_load(pathlib.Path("./charmcraft.yaml").read_text())
 APP_NAME = METADATA["name"]
+POSTGRESQL_NAME = "postgresql-k8s"
 
 
-@pytest.mark.abort_on_fail
-async def test_build_and_deploy(ops_test: OpsTest):
-    """Build the charm-under-test and deploy it together with related charms.
+def test_deploy(
+    charm: pathlib.Path, juju: jubilant.Juju, hive_metastore_image: str | None
+) -> None:
+    """Deploy the charm under test.
 
     Assert on the unit status before any relations/configurations take place.
     """
-    # Build and deploy charm from local source folder
-    charm = await ops_test.build_charm(".")
-    resources = {"httpbin-image": METADATA["resources"]["httpbin-image"]["upstream-source"]}
+    resources = {}
+    for name, res in METADATA["resources"].items():
+        if _res := res.get("upstream-source"):
+            resources[name] = _res
+    if hive_metastore_image:
+        resources["hive-metastore-image"] = hive_metastore_image
 
-    # Deploy the charm and wait for active/idle status
-    await asyncio.gather(
-        ops_test.model.deploy(charm, resources=resources, application_name=APP_NAME),
-        ops_test.model.wait_for_idle(
-            apps=[APP_NAME], status="active", raise_on_blocked=True, timeout=1000
-        ),
+    juju.deploy(f"./{charm}", app=APP_NAME, resources=resources)
+
+    juju.wait(jubilant.all_blocked, timeout=1000)
+
+
+def test_integrate(
+    charm: pathlib.Path, juju: jubilant.Juju, hive_metastore_image: str | None
+) -> None:
+    """Take the charm under test and integrate with PostgreSQL.
+
+    Assert on the unit status after integrations take place.
+    """
+    # `juju` is module scoped so Hive Metastore is already deployed from `test_deploy`.
+    juju.deploy("postgresql-k8s", app=POSTGRESQL_NAME, channel="14/stable", trust=True)
+    juju.wait(
+        lambda status: jubilant.all_active(status, POSTGRESQL_NAME),
+        error=jubilant.any_error,
+        timeout=1000,
     )
+
+    # Integrate applications
+    juju.integrate(APP_NAME, POSTGRESQL_NAME)
+
+    # Wait for the applications to be active
+    juju.wait(jubilant.all_active, error=jubilant.any_error, timeout=1000)
