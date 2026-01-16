@@ -51,16 +51,20 @@ class HiveMetastoreK8SOperatorCharm(TypedCharmBase[CharmConfig]):
 
     # Event handlers -----------------------------------------------------------------
 
-    def _on_pebble_ready(self, _: ops.PebbleReadyEvent) -> None:
+    def _on_pebble_ready(self, event: ops.PebbleReadyEvent) -> None:
         container = self._get_container()
-        if container is not None and container.can_connect():
-            try:
-                meta_file = container.pull("/rockcraft.yaml")
-                meta = yaml.safe_load(meta_file)
-                if meta and "version" in meta:
-                    self.unit.set_workload_version(meta["version"])
-            except (PathError, yaml.YAMLError) as e:
-                logger.debug("Could not get workload version: %s", str(e))
+        if not (container and container.can_connect()):
+            event.defer()
+            return
+        try:
+            meta_file = container.pull("/rockcraft.yaml")
+            meta = yaml.safe_load(meta_file)
+            if meta and "version" in meta:
+                self.unit.set_workload_version(meta["version"])
+            else:
+                raise ValueError("Cannot find 'version' in 'rockcraft.yaml'.")
+        except (PathError, ValueError, yaml.YAMLError) as e:
+            logger.debug("Could not get workload version: %s", str(e))
         self._reconcile()
 
     def _on_config_changed(self, _: ops.ConfigChangedEvent) -> None:

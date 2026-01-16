@@ -39,7 +39,7 @@ config:
       default: ""
       description: |
         Additional options to tune JVM.
-        Format: A string of constructed as if calling `java` with them.
+        Format: A string of options as if calling `java` with them.
         Example: "-Xmx2g -Xms256m"
     # https://cwiki.apache.org/confluence/pages/viewpage.action?pageId=27842758#ConfigurationProperties-hive.metastore.server.min.threads
     hms-min-threads:

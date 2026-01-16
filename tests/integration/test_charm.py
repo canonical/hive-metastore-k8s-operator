@@ -9,6 +9,7 @@ import yaml
 
 METADATA = yaml.safe_load(pathlib.Path("./charmcraft.yaml").read_text())
 APP_NAME = METADATA["name"]
+POSTGRESQL_NAME = "postgresql-k8s"
 
 
 def test_deploy(
@@ -29,3 +30,39 @@ def test_deploy(
 
     # Wait for the application to be blocked (since it's missing relations)
     juju.wait(jubilant.all_blocked, timeout=1000)
+
+
+def test_integrate(
+    charm: pathlib.Path, juju: jubilant.Juju, hive_metastore_image: str | None
+) -> None:
+    """Deploy the charm under test and integrate with PostgreSQL.
+
+    Assert on the unit status after integrations take place.
+    """
+    resources = {}
+    for name, res in METADATA["resources"].items():
+        if _res := res.get("upstream-source"):
+            resources[name] = _res
+    if hive_metastore_image:
+        resources["hive-metastore-image"] = hive_metastore_image
+
+    juju.deploy(f"./{charm}", app=APP_NAME, resources=resources)
+    juju.deploy("postgresql-k8s", app=POSTGRESQL_NAME, channel="14/stable", trust=True)
+
+    # Wait for the application to be blocked (since it's missing relations)
+    juju.wait(
+        lambda status: jubilant.all_blocked(status, APP_NAME),
+        error=jubilant.any_error,
+        timeout=1000,
+    )
+    juju.wait(
+        lambda status: jubilant.all_active(status, POSTGRESQL_NAME),
+        error=jubilant.any_error,
+        timeout=1000,
+    )
+
+    # Integrate applications
+    juju.integrate(APP_NAME, POSTGRESQL_NAME)
+
+    # Wait for the applications to be active
+    juju.wait(jubilant.all_active, error=jubilant.any_error, timeout=1000)

@@ -213,7 +213,7 @@ def _build_jdbc_url(pg_relation: PostgresRelationModel) -> str:
     return f"{base}?{'&'.join(params)}"
 
 
-# This is currently a no-op but we will probably need it.
+# TODO (mertalpt): This is currently a no-op but we will probably need it.
 def _normalize_ca(text: str) -> str:
     """Normalize a CA certificate in PEM format.
 
