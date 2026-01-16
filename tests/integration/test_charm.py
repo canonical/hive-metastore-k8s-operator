@@ -28,33 +28,18 @@ def test_deploy(
 
     juju.deploy(f"./{charm}", app=APP_NAME, resources=resources)
 
-    # Wait for the application to be blocked (since it's missing relations)
     juju.wait(jubilant.all_blocked, timeout=1000)
 
 
 def test_integrate(
     charm: pathlib.Path, juju: jubilant.Juju, hive_metastore_image: str | None
 ) -> None:
-    """Deploy the charm under test and integrate with PostgreSQL.
+    """Take the charm under test and integrate with PostgreSQL.
 
     Assert on the unit status after integrations take place.
     """
-    resources = {}
-    for name, res in METADATA["resources"].items():
-        if _res := res.get("upstream-source"):
-            resources[name] = _res
-    if hive_metastore_image:
-        resources["hive-metastore-image"] = hive_metastore_image
-
-    juju.deploy(f"./{charm}", app=APP_NAME, resources=resources)
+    # `juju` is module scoped so Hive Metastore is already deployed from `test_deploy`.
     juju.deploy("postgresql-k8s", app=POSTGRESQL_NAME, channel="14/stable", trust=True)
-
-    # Wait for the application to be blocked (since it's missing relations)
-    juju.wait(
-        lambda status: jubilant.all_blocked(status, APP_NAME),
-        error=jubilant.any_error,
-        timeout=1000,
-    )
     juju.wait(
         lambda status: jubilant.all_active(status, POSTGRESQL_NAME),
         error=jubilant.any_error,
