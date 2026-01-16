@@ -26,6 +26,12 @@ parts:
     build-snaps:
       - astral-uv
 
+  templates:
+    plugin: dump
+    source: templates
+    organize:
+      "*": templates/
+
 charm-libs:
   - lib: data_platform_libs.data_interfaces
     version: "0"
