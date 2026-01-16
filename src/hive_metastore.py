@@ -4,12 +4,12 @@
 """Hive Metastore related logic."""
 
 import json
-import textwrap
+from pathlib import Path
 from typing import Callable, Optional
 
 import ops
 import pydantic
-from jinja2 import Template
+from jinja2 import Environment, FileSystemLoader
 
 import constants
 
@@ -173,19 +173,9 @@ def _render_hive_site(pg_relation: PostgresRelationModel) -> str:
         "hive.metastore.uris": f"thrift://0.0.0.0:{constants.HIVE_PORT}",
     }
 
-    template_str = textwrap.dedent("""\
-        <?xml version="1.0" encoding="UTF-8"?>
-        <configuration>
-        {%- for name, value in properties.items() %}
-          <property>
-            <name>{{ name | e }}</name>
-            <value>{{ value | e }}</value>
-          </property>
-        {%- endfor %}
-        </configuration>
-        """)
-
-    template = Template(template_str)
+    template_path = Path(__file__).parent.parent / "templates"
+    template_env = Environment(loader=FileSystemLoader(template_path))
+    template = template_env.get_template(constants.HIVE_SITE_TEMPLATE)
     rendered = template.render(properties=properties)
     # Ensure trailing newline for compatibility
     return rendered.rstrip() + "\n"

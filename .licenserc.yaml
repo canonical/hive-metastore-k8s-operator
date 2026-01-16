@@ -15,6 +15,7 @@ header:
   paths-ignore:
     - '.github/files/**'
     - '**/*.j2'
+    - '**/*.jinja'
     - '**/*.json'
     - '**/*.md'
     - '**/*.txt'
