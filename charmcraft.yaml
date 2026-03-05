@@ -36,7 +36,9 @@ charm-libs:
   - lib: data_platform_libs.data_interfaces
     version: "0"
   - lib: data_platform_libs.data_models
-    version: "0"  
+    version: "0"
+  - lib: data_platform_libs.s3
+    version: "0"
 
 config:
   options:
@@ -94,18 +96,9 @@ config:
 #   schematool-validate:
 #     description: Runs `schematool` with `validate` option to validate the metadata.
 
-storage:
-  hive-metastore-warehouse:
-    type: filesystem 
-    description: Persistent storage for Hive Metastore metadata.
-    minimum-size: 100M
-
 containers:
   hive-metastore:
     resource: hive-metastore-image
-    mounts:
-      - storage: hive-metastore-warehouse
-        location: /user/hive/warehouse
 
 resources:
   hive-metastore-image:
@@ -115,4 +108,7 @@ resources:
 requires:
   postgresql:
     interface: postgresql_client
+    limit: 1
+  s3-credentials:
+    interface: s3
     limit: 1

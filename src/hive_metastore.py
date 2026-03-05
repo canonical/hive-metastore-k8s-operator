@@ -115,14 +115,74 @@ class PostgresRelationModel(pydantic.BaseModel):
         return wrapped
 
 
+class S3RelationModel(pydantic.BaseModel):
+    """Wrapper for S3 connection information from the s3-credentials relation."""
+
+    access_key: str = pydantic.Field(alias="access-key")
+    secret_key: str = pydantic.Field(alias="secret-key")
+    bucket: str
+    endpoint: str
+    region: str = ""
+    path: str = ""
+    tls_ca_chain: Optional[list[str]] = pydantic.Field(default=None, alias="tls-ca-chain")
+
+    class Config:
+        """Pydantic model configuration."""
+
+        populate_by_name = True
+
+    @pydantic.validator("tls_ca_chain", pre=True)
+    def parse_tls_ca_chain(cls, v):  # noqa: N805
+        """Parse tls-ca-chain from JSON string if necessary.
+
+        Args:
+            v: Raw value from the relation databag.
+
+        Returns:
+            A list of CA chain strings or None.
+        """
+        if isinstance(v, str):
+            try:
+                return json.loads(v)
+            except json.JSONDecodeError:
+                return None
+        return v
+
+    @property
+    def warehouse_dir(self) -> str:
+        """S3A warehouse directory URI.
+
+        Returns:
+            An s3a:// URI pointing to the warehouse directory.
+        """
+        base = f"s3a://{self.bucket}"
+        if self.path:
+            base = f"{base}/{self.path.strip('/')}"
+        return f"{base}/{constants.S3_WAREHOUSE_PREFIX}"
+
+    @property
+    def path_style_access(self) -> bool:
+        """Whether to use path-style access for S3.
+
+        MinIO and most self-hosted S3-compatible endpoints require path-style.
+
+        Returns:
+            True (path-style is the safe default for MinIO).
+        """
+        return True
+
+
 def manage_configuration_files(
-    container: ops.Container, pg_relation: PostgresRelationModel
+    container: ops.Container,
+    pg_relation: PostgresRelationModel,
+    s3_info: S3RelationModel,
 ) -> bool:
     """Render and organize configuration files in the container filesystem.
 
     Args:
         container: Container in which files will be managed.
         pg_relation: Object to use for Postgres credentials.
+        s3_info: S3 connection information for warehouse storage.
 
     Returns:
         True if there has been a change in files, false otherwise.
@@ -135,7 +195,7 @@ def manage_configuration_files(
     except ops.pebble.PathError:
         curr_contents = ""
 
-    new_contents = _render_hive_site(pg_relation)
+    new_contents = _render_hive_site(pg_relation, s3_info)
     if curr_contents != new_contents:
         container.push(constants.HIVE_SITE_PATH, new_contents, make_dirs=True, permissions=0o640)
         has_changed = True
@@ -155,11 +215,12 @@ def manage_configuration_files(
     return has_changed
 
 
-def _render_hive_site(pg_relation: PostgresRelationModel) -> str:
-    """Render `hive-site.xml` configuration file using a Jinja template.
+def _render_hive_site(pg_relation: PostgresRelationModel, s3_info: S3RelationModel) -> str:
+    """Render ``hive-site.xml`` configuration file using a Jinja template.
 
     Args:
         pg_relation: Wrapper for Postgres relation data.
+        s3_info: S3 connection information for warehouse storage.
     """
     properties = {
         "javax.jdo.option.ConnectionURL": _build_jdbc_url(pg_relation),
@@ -171,7 +232,16 @@ def _render_hive_site(pg_relation: PostgresRelationModel) -> str:
         "datanucleus.fixedDatastore": "true",
         "hive.metastore.schema.verification": "false",
         "hive.metastore.uris": f"thrift://0.0.0.0:{constants.HIVE_PORT}",
+        # S3A warehouse configuration
+        "hive.metastore.warehouse.dir": s3_info.warehouse_dir,
+        "fs.s3a.endpoint": s3_info.endpoint,
+        "fs.s3a.access.key": s3_info.access_key,
+        "fs.s3a.secret.key": s3_info.secret_key,
+        "fs.s3a.path.style.access": str(s3_info.path_style_access).lower(),
     }
+
+    if s3_info.region:
+        properties["fs.s3a.endpoint.region"] = s3_info.region
 
     template_path = Path(__file__).parent.parent / "templates"
     template_env = Environment(loader=FileSystemLoader(template_path))

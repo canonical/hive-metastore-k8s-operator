@@ -14,3 +14,6 @@ SCHEMATOOL_PATH = "/opt/hive/bin/schematool"
 SCHEMATOOL_TIMEOUT = 600
 HIVE_PORT = 9083
 POSTGRES_RELATION = "postgresql"
+S3_RELATION = "s3-credentials"
+S3_BUCKET_NAME = "hive-metastore"
+S3_WAREHOUSE_PREFIX = "warehouse"

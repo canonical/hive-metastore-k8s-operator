@@ -52,6 +52,19 @@ parts:
     stage:
       - opt/hive
 
+  # ---- Hadoop AWS S3A Support ----
+  hadoop-aws:
+    after:
+      - hadoop
+      - hive
+    plugin: nil
+    override-build: |
+      mkdir -p $CRAFT_PART_INSTALL/opt/hive/lib/
+      cp $CRAFT_STAGE/opt/hadoop/share/hadoop/tools/lib/hadoop-aws-3.4.1.jar \
+         $CRAFT_PART_INSTALL/opt/hive/lib/
+      cp $CRAFT_STAGE/opt/hadoop/share/hadoop/tools/lib/aws-java-sdk-bundle-*.jar \
+         $CRAFT_PART_INSTALL/opt/hive/lib/
+
   # ---- PostgreSQL JDBC Driver ----
   postgres-jdbc:
     after:

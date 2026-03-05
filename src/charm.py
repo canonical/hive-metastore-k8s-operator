@@ -15,6 +15,11 @@ from charms.data_platform_libs.v0.data_interfaces import (
     DatabaseRequires,
 )
 from charms.data_platform_libs.v0.data_models import TypedCharmBase
+from charms.data_platform_libs.v0.s3 import (
+    CredentialsChangedEvent,
+    CredentialsGoneEvent,
+    S3Requirer,
+)
 from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus, WaitingStatus
 from ops.pebble import APIError, ChangeError, ConnectionError, PathError
 
@@ -40,6 +45,12 @@ class HiveMetastoreK8SOperatorCharm(TypedCharmBase[CharmConfig]):
             database_name=constants.DEFAULT_DATABASE_NAME,
         )
 
+        self.s3 = S3Requirer(
+            self,
+            relation_name=constants.S3_RELATION,
+            bucket_name=constants.S3_BUCKET_NAME,
+        )
+
         framework.observe(self.on[constants.CONTAINER_NAME].pebble_ready, self._on_pebble_ready)
         framework.observe(self.on.config_changed, self._on_config_changed)
         framework.observe(self.on.update_status, self._on_update_status)
@@ -48,6 +59,10 @@ class HiveMetastoreK8SOperatorCharm(TypedCharmBase[CharmConfig]):
         framework.observe(self.postgresql.on.endpoints_changed, self._on_database_event)
 
         framework.observe(self.on.postgresql_relation_broken, self._on_postgresql_broken)
+
+        framework.observe(self.s3.on.credentials_changed, self._on_s3_event)
+        framework.observe(self.s3.on.credentials_gone, self._on_s3_event)
+        framework.observe(self.on[constants.S3_RELATION].relation_broken, self._on_s3_broken)
 
     # Event handlers -----------------------------------------------------------------
 
@@ -87,7 +102,55 @@ class HiveMetastoreK8SOperatorCharm(TypedCharmBase[CharmConfig]):
     def _on_postgresql_broken(self, _: ops.RelationBrokenEvent) -> None:
         self._reconcile()
 
+    def _on_s3_event(
+        self,
+        event: ops.EventBase,
+    ) -> None:
+        if not isinstance(event, (CredentialsChangedEvent, CredentialsGoneEvent)):
+            logger.debug("Ignoring unexpected S3 event: %s", type(event).__name__)
+            return
+
+        self._reconcile()
+
+    def _on_s3_broken(self, _: ops.RelationBrokenEvent) -> None:
+        self._reconcile()
+
     # Reconciliation -----------------------------------------------------------------
+
+    def _check_relations(
+        self, container: ops.Container
+    ) -> Optional[tuple[hive_metastore.PostgresRelationModel, hive_metastore.S3RelationModel]]:
+        """Validate that all required relations are present and populated.
+
+        Sets the unit status to Blocked if a relation is missing and stops the service.
+
+        Args:
+            container: Container to stop if relations are missing.
+
+        Returns:
+            A tuple of (PostgresRelationModel, S3RelationModel) if both are ready,
+            or None if any relation is missing.
+        """
+        # Check if Postgres relation is there.
+        if (raw_pg_relation := self.model.get_relation(constants.POSTGRES_RELATION)) is None:
+            self._stop_service(container)
+            self.unit.status = BlockedStatus("waiting for postgresql relation")
+            return None
+
+        pg_relation = raw_pg_relation.load(
+            hive_metastore.PostgresRelationModel,
+            raw_pg_relation.app,
+            decoder=hive_metastore.PostgresRelationModel.decode(self),
+        )
+
+        # Check if S3 relation is there.
+        s3_info = self._get_s3_connection_info()
+        if s3_info is None:
+            self._stop_service(container)
+            self.unit.status = BlockedStatus("waiting for s3-credentials relation")
+            return None
+
+        return pg_relation, s3_info
 
     def _reconcile(self) -> None:
         # TODO (mertalpt): Check if it would be better to update
@@ -97,21 +160,14 @@ class HiveMetastoreK8SOperatorCharm(TypedCharmBase[CharmConfig]):
             self.unit.status = WaitingStatus("waiting for container startup")
             return
 
-        # Check if Postgres relation is there.
-        if (raw_pg_relation := self.model.get_relation(constants.POSTGRES_RELATION)) is None:
-            self._stop_service(container)
-            self.unit.status = BlockedStatus("waiting for postgresql relation")
+        relations = self._check_relations(container)
+        if relations is None:
             return
-
-        pg_relation = raw_pg_relation.load(
-            hive_metastore.PostgresRelationModel,
-            raw_pg_relation.app,
-            decoder=hive_metastore.PostgresRelationModel.decode(self),
-        )
+        pg_relation, s3_info = relations
 
         # Check if a configuration update is needed.
         try:
-            do_restart = hive_metastore.manage_configuration_files(container, pg_relation)
+            do_restart = hive_metastore.manage_configuration_files(container, pg_relation, s3_info)
         except ConnectionError:
             self.unit.status = WaitingStatus("waiting for container filesystem")
             return
@@ -194,6 +250,25 @@ class HiveMetastoreK8SOperatorCharm(TypedCharmBase[CharmConfig]):
             "HADOOP_CONF_DIR": constants.HIVE_CONF_DIR,
             "PATH": "/opt/hadoop/bin:/opt/hive/bin:/usr/bin:/bin",
         }
+
+    def _get_s3_connection_info(self) -> Optional[hive_metastore.S3RelationModel]:
+        """Extract S3 connection information from the s3-credentials relation.
+
+        Returns:
+            An S3RelationModel object if valid credentials exist, None otherwise.
+        """
+        credentials = self.s3.get_s3_connection_info()
+        if not credentials:
+            return None
+
+        # Ensure bucket has a default value.
+        credentials.setdefault("bucket", constants.S3_BUCKET_NAME)
+
+        try:
+            return hive_metastore.S3RelationModel(**credentials)
+        except Exception:
+            logger.warning("Invalid or incomplete S3 credentials.", exc_info=True)
+            return None
 
     def _stop_service(self, container: ops.Container) -> None:
         """Stop the Hive Metastore service in the given container.
